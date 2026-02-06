@@ -7,8 +7,8 @@ REPLAYPOKER_PROFILE = UIProfile(
         upper=np.array([180, 255, 80])
     ),
     panel_geometry=PanelGeometry(
-        min_width=120,
-        min_height=30,
+        min_width=50,
+        min_height=50,
         aspect_min=2.0,
         aspect_max=8.0
     )

@@ -2,16 +2,27 @@ import cv2
 from ui_profiles.replay import REPLAYPOKER_PROFILE
 from detectors.panel_detector import PanelDetector
 from app.pipeline import PokerVisionPipeline
+from debug.visualize import DebugVisualizer
 
 frame = cv2.imread("images/table.png")
 
 panel_detector = PanelDetector(REPLAYPOKER_PROFILE)
 pipeline = PokerVisionPipeline(panel_detector)
 
-panels = pipeline.process(frame)
+result = pipeline.process(frame)
 
-for p in panels:
-    cv2.rectangle(frame, (p.x1, p.y1), (p.x2, p.y2), (0,255,0), 2)
+panels = result["panels"]
+table_center = result["table_center"]
 
-cv2.imshow("Panels", frame)
+vis = frame.copy()
+
+DebugVisualizer.draw_panels(vis, panels)
+DebugVisualizer.draw_table_center(vis, table_center)
+DebugVisualizer.draw_rect(vis, result["community_zone"], color=(0, 0, 255), thickness=2)
+
+cv2.imshow("Poker Vision Debug", vis)
 cv2.waitKey(0)
+
+
+result = pipeline.process(frame)
+
