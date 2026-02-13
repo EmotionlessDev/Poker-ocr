@@ -3,13 +3,14 @@ from .base import UIProfile, PanelColorRange, PanelGeometry
 
 REPLAYPOKER_PROFILE = UIProfile(
     panel_color=PanelColorRange(
-        lower=np.array([0, 0, 0]),
-        upper=np.array([180, 255, 80])
+        # Dark player-info panels (low value, low-moderate saturation)
+        lower=np.array([80, 15, 10]),
+        upper=np.array([130, 120, 55])
     ),
     panel_geometry=PanelGeometry(
-        min_width=100,
-        min_height=80,
-        aspect_min=2.0,
-        aspect_max=8.0
+        min_width=80,
+        min_height=30,
+        aspect_min=1.5,
+        aspect_max=6.0
     )
 )

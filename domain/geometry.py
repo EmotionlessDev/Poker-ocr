@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 @dataclass
@@ -43,3 +44,29 @@ def compute_community_cards_zone(table_center: Point, table_rect: Rect) -> Rect:
     y2 = cy + h // 2
 
     return Rect(x1, y1, x2, y2)
+
+def compute_player_positions(table_rect: Rect) -> list[Point]:
+    """
+    Точные позиции 6-max ReplayPoker.
+    Масштабируются от размера окна.
+    """
+
+    seat_ratios = [
+
+        (0.68, 0.67),  # правый нижний
+        (0.81, 0.46),  # правый средний
+        (0.68, 0.25),  # правый верхний
+
+        (0.32, 0.25),  # левый верхний
+        (0.20, 0.46),  # левый средний
+        (0.32, 0.67),  # левый нижний
+    ]
+
+    positions = []
+
+    for rx, ry in seat_ratios:
+        x = int(table_rect.width * rx)
+        y = int(table_rect.height * ry)
+        positions.append(Point(x, y))
+
+    return positions

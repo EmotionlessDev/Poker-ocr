@@ -35,3 +35,15 @@ class DebugVisualizer:
             color,
             thickness
         )
+    
+    @staticmethod
+    def draw_player_positions(frame, positions):
+        for p in positions:
+            cv2.circle(frame, (p.x, p.y), 12, (255, 0, 0), -1)
+            cv2.rectangle(
+                frame,
+                (p.x - 60, p.y - 25),
+                (p.x + 60, p.y + 25),
+                (0, 255, 255),
+                2
+            )

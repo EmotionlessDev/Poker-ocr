@@ -1,3 +1,12 @@
 venv/
 screenshots/
 *__pycache__/
+
+# Ignore all .pyc files
+*.pyc
+# Ignore all .pyo files
+*.pyo
+# Ignore all .pyd files
+*.pyd
+# Ignore all .log files
+*.log

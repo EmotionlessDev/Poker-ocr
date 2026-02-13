@@ -1,34 +1,120 @@
-
 import sys
-import time
-import mss
+import win32gui
 import numpy as np
+import mss
+import cv2
+import math
+
 from PyQt6 import QtWidgets, QtGui, QtCore
 
-from ui_profiles.replay import REPLAYPOKER_PROFILE
-from detectors.panel_detector import PanelDetector
 from app.pipeline import PokerVisionPipeline
-from debug.visualize import DebugVisualizer
 
-# ---------------- PyQt Overlay ----------------
-class Overlay(QtWidgets.QWidget):
-    def __init__(self, geometry):
+
+# -----------------------------
+# KEYWORDS
+# -----------------------------
+_POKER_KEYWORDS = [
+    "replaypoker", "replay poker", "casino.org",
+    "- nl ", "- pl ", "hold'em", "holdem", "omaha",
+    "no limit", "pot limit", "stakes", "tournament",
+    "ring game", "sit & go",
+]
+
+
+# -----------------------------
+# Find window
+# -----------------------------
+def find_poker_window():
+    candidates = []
+
+    def enum_callback(hwnd, _):
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+
+        title = win32gui.GetWindowText(hwnd)
+        if not title:
+            return
+
+        title_lower = title.lower()
+        score = sum(1 for kw in _POKER_KEYWORDS if kw in title_lower)
+
+        if score > 0:
+            candidates.append((score, hwnd, title))
+
+    win32gui.EnumWindows(enum_callback, None)
+
+    if not candidates:
+        return None
+
+    candidates.sort(reverse=True, key=lambda x: x[0])
+    best = candidates[0]
+    print(f"Найдено окно: {best[2]}")
+    return best[1]
+
+
+def get_window_rect(hwnd):
+    x1, y1, x2, y2 = win32gui.GetWindowRect(hwnd)
+    return x1, y1, x2 - x1, y2 - y1
+
+
+# -----------------------------
+# Overlay HUD
+# -----------------------------
+class OverlayHUD(QtWidgets.QWidget):
+    def __init__(self, hwnd):
         super().__init__()
 
-        # Frameless, прозрачное окно поверх всех
+        self.hwnd = hwnd
+        self.pipeline_result = None
+
+        self.pipeline = PokerVisionPipeline(seats=6)
+        self.sct = mss.mss()
+
         self.setWindowFlags(
             QtCore.Qt.WindowType.FramelessWindowHint |
             QtCore.Qt.WindowType.WindowStaysOnTopHint |
             QtCore.Qt.WindowType.Tool
         )
+
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setGeometry(*geometry)  # x, y, width, height
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-        self.pipeline_result = None
+        self.update_position()
 
-    def set_pipeline_result(self, result):
-        self.pipeline_result = result
-        self.update()  # перерисовка
+        # Обновление позиции окна
+        self.pos_timer = QtCore.QTimer()
+        self.pos_timer.timeout.connect(self.update_position)
+        self.pos_timer.start(100)
+
+        # Обработка кадра (10 FPS)
+        self.cv_timer = QtCore.QTimer()
+        self.cv_timer.timeout.connect(self.process_frame)
+        self.cv_timer.start(100)
+
+    def update_position(self):
+        if not win32gui.IsWindow(self.hwnd):
+            self.close()
+            return
+
+        x, y, w, h = get_window_rect(self.hwnd)
+        self.setGeometry(x, y, w, h)
+
+    def process_frame(self):
+        x, y, w, h = get_window_rect(self.hwnd)
+
+        monitor = {
+            "left": x,
+            "top": y,
+            "width": w,
+            "height": h,
+        }
+
+        screenshot = self.sct.grab(monitor)
+        frame = np.array(screenshot)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+        self.pipeline_result = self.pipeline.process(frame)
+        self.update()
 
     def paintEvent(self, event):
         if self.pipeline_result is None:
@@ -37,62 +123,41 @@ class Overlay(QtWidgets.QWidget):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
 
-        # Рисуем панели
-        pen = QtGui.QPen(QtGui.QColor(0, 255, 0))
-        pen.setWidth(2)
+        # Центр стола
+        center = self.pipeline_result["table_center"]
+
+        pen = QtGui.QPen(QtGui.QColor(0, 0, 255))
+        pen.setWidth(10)
         painter.setPen(pen)
-        for p in self.pipeline_result["panels"]:
-            painter.drawRect(p.x1, p.y1, p.x2 - p.x1, p.y2 - p.y1)
+        painter.drawPoint(center.x, center.y)
+        painter.drawText(20, 20, f"{self.width()} x {self.height()}")
 
-        # Рисуем центр стола
-        center = self.pipeline_result.get("table_center")
-        if center:
-            painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 0, 0)))
-            painter.drawEllipse(center.x - 5, center.y - 5, 10, 10)
+        # Позиции игроков
+        pen = QtGui.QPen(QtGui.QColor(0, 255, 0))
+        pen.setWidth(3)
+        painter.setPen(pen)
 
-        # Рисуем зону общих карт
-        comm = self.pipeline_result.get("community_zone")
-        if comm:
-            pen = QtGui.QPen(QtGui.QColor(0, 0, 255))
-            pen.setWidth(2)
-            painter.setPen(pen)
-            painter.drawRect(comm.x1, comm.y1, comm.x2 - comm.x1, comm.y2 - comm.y1)
+        for p in self.pipeline_result["player_positions"]:
+            painter.drawEllipse(p.x - 12, p.y - 12, 24, 24)
+            painter.drawRect(p.x - 60, p.y - 25, 120, 50)
 
-# ----------------- Main -----------------
+
+# -----------------------------
+# MAIN
+# -----------------------------
 def main():
-    # Настройка PyQt приложения
     app = QtWidgets.QApplication(sys.argv)
 
-    # Геометрия overlay: весь экран (можно подставить координаты окна браузера)
-    screen = app.primaryScreen()
-    geometry = (0, 0, screen.size().width(), screen.size().height())
+    hwnd = find_poker_window()
+    if not hwnd:
+        print("Окно не найдено")
+        return
 
-    overlay = Overlay(geometry)
+    overlay = OverlayHUD(hwnd)
     overlay.show()
-
-    # ----------------- Инициализация пайплайна -----------------
-    panel_detector = PanelDetector(REPLAYPOKER_PROFILE)
-    pipeline = PokerVisionPipeline(panel_detector)
-
-    # ----------------- Захват экрана -----------------
-    sct = mss.mss()
-    monitor = sct.monitors[1]  # основной монитор
-
-    # Таймер для обновления overlay ~30 FPS
-    def update():
-        screenshot = sct.grab(monitor)
-        frame = np.array(screenshot)
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
-
-        result = pipeline.process(frame)
-        overlay.set_pipeline_result(result)
-
-    timer = QtCore.QTimer()
-    timer.timeout.connect(update)
-    timer.start(33)  # примерно 30 FPS
 
     sys.exit(app.exec())
 
+
 if __name__ == "__main__":
-    import cv2
     main()
