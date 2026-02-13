@@ -2,7 +2,8 @@ from domain.geometry import (
     Rect,
     Point,
     compute_community_cards_zone,
-    compute_player_positions
+    compute_player_positions,
+    compute_player_zones
 )
 
 
@@ -28,9 +29,14 @@ class PokerVisionPipeline:
         # Позиции игроков
         player_positions = compute_player_positions(table_rect)
 
+        # Зоны игроков
+
+        player_zones = compute_player_zones(table_rect)
+
 
         return {
             "table_center": table_center,
             "community_zone": community_zone,
-            "player_positions": player_positions
+            "player_positions": player_positions,
+            "player_zones": player_zones
         }

@@ -70,3 +70,40 @@ def compute_player_positions(table_rect: Rect) -> list[Point]:
         positions.append(Point(x, y))
 
     return positions
+
+def compute_player_zones(table_rect: Rect) -> list[Rect]:
+    """
+    Вычисляет прямоугольные зоны вокруг игроков.
+    Размеры зон подбираются под UI.
+    """
+    seat_ratios = [
+        (0.68, 0.67),  # правый нижний
+        (0.81, 0.46),  # правый средний
+        (0.68, 0.25),  # правый верхний
+        (0.32, 0.25),  # левый верхний
+        (0.20, 0.46),  # левый средний
+        (0.32, 0.67),  # левый нижний
+    ]
+
+    zones = []
+
+    # Пропорции прямоугольника зоны от размера стола
+    zone_w_ratio = 0.25
+    zone_h_ratio = 0.12
+
+    for rx, ry in seat_ratios:
+        cx = int(table_rect.width * rx)
+        cy = int(table_rect.height * ry)
+
+        w = int(table_rect.width * zone_w_ratio)
+        h = int(table_rect.height * zone_h_ratio)
+
+        x1 = cx - w // 2
+        y1 = cy - h // 2
+        x2 = cx + w // 2
+        y2 = cy + h // 2
+
+        zones.append(Rect(x1, y1, x2, y2))
+
+    return zones
+

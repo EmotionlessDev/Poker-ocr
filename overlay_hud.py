@@ -132,14 +132,23 @@ class OverlayHUD(QtWidgets.QWidget):
         painter.drawPoint(center.x, center.y)
         painter.drawText(20, 20, f"{self.width()} x {self.height()}")
 
+        # Зона общих карт
+        comm = self.pipeline_result["community_zone"]
+        pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.drawRect(comm.x1, comm.y1, comm.width, comm.height)
+        
+
         # Позиции игроков
+        player_zones = self.pipeline_result.get("player_zones", [])
         pen = QtGui.QPen(QtGui.QColor(0, 255, 0))
-        pen.setWidth(3)
+        pen.setWidth(2)
         painter.setPen(pen)
 
-        for p in self.pipeline_result["player_positions"]:
-            painter.drawEllipse(p.x - 12, p.y - 12, 24, 24)
-            painter.drawRect(p.x - 60, p.y - 25, 120, 50)
+        for zone in player_zones:
+            painter.drawRect(zone.x1, zone.y1, zone.width, zone.height)
+
 
 
 # -----------------------------
