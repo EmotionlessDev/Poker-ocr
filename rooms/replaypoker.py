@@ -27,6 +27,7 @@ class ReplayPokerGeometry(BaseRoomGeometry):
         )
 
     def compute_player_zones(self, table_rect, frame=None):
+        table_center = self.compute_table_center(frame.shape)
 
         seat_ratios = [
             (0.68, 0.67),
@@ -60,7 +61,20 @@ class ReplayPokerGeometry(BaseRoomGeometry):
             refined = []
             for z in zones:
                 refined_zone = refine_zone_by_dark_panel(frame, z)
+
+                # Expand the refined zone to include the player's cards and stack
+                refined_zone = refined_zone.expand_towards(
+                    target=table_center,
+                    expand_main=140,
+                    expand_cross=50,
+                    bounds=frame.shape
+                )
+
                 refined.append(refined_zone)
-            return refined
+
+
+            zones= refined
+
+  
 
         return zones

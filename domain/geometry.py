@@ -15,6 +15,72 @@ class Rect:
     @property
     def height(self):
         return self.y2 - self.y1
+    
+    @property
+    def center(self):
+        return Point(
+            (self.x1 + self.x2) // 2,
+            (self.y1 + self.y2) // 2
+        )
+    
+    def expand(self, left=0, top=0, right=0, bottom=0, bounds=None):
+        x1 = self.x1 - left
+        y1 = self.y1 - top
+        x2 = self.x2 + right
+        y2 = self.y2 + bottom
+
+        if bounds is not None:
+            h, w = bounds[:2]
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(w, x2)
+            y2 = min(h, y2)
+
+        return Rect(x1, y1, x2, y2)
+
+    def expand_towards(self,
+                       target: "Point",
+                       expand_main=120,
+                       expand_cross=40,
+                       bounds=None) -> "Rect":
+
+        cx, cy = self.center.x, self.center.y
+        dx = target.x - cx
+        dy = target.y - cy
+
+        x1, y1, x2, y2 = self.x1, self.y1, self.x2, self.y2
+
+        if abs(dx) > abs(dy):
+            # горизонтальное направление
+            if dx > 0:
+                x2 += expand_main
+            else:
+                x1 -= expand_main
+
+            y1 -= expand_cross
+            y2 += expand_cross
+        else:
+            # вертикальное направление
+            if dy > 0:
+                y2 += expand_main
+            else:
+                y1 -= expand_main
+
+            x1 -= expand_cross
+            x2 += expand_cross
+
+        if bounds is not None:
+            h, w = bounds[:2]
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(w, x2)
+            y2 = min(h, y2)
+
+        return Rect(x1, y1, x2, y2)
+    
+    
+    
+    
 
 @dataclass
 class Point:
