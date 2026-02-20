@@ -1,5 +1,6 @@
 from domain.geometry import Rect, Point
 from .base import BaseRoomGeometry
+from .replaypoker_refiner import refine_zone_by_dark_panel
 
 class ReplayPokerGeometry(BaseRoomGeometry):
 
@@ -25,7 +26,7 @@ class ReplayPokerGeometry(BaseRoomGeometry):
             cy + h // 2
         )
 
-    def compute_player_zones(self, table_rect):
+    def compute_player_zones(self, table_rect, frame=None):
 
         seat_ratios = [
             (0.68, 0.67),
@@ -54,5 +55,12 @@ class ReplayPokerGeometry(BaseRoomGeometry):
                 cx + w // 2,
                 cy + h // 2
             ))
+
+        if frame is not None:
+            refined = []
+            for z in zones:
+                refined_zone = refine_zone_by_dark_panel(frame, z)
+                refined.append(refined_zone)
+            return refined
 
         return zones
