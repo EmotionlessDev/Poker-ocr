@@ -4,6 +4,7 @@ import numpy as np
 import mss
 import cv2
 import math
+import argparse
 
 from PyQt6 import QtWidgets, QtGui, QtCore
 
@@ -13,6 +14,7 @@ from app.pipeline import PokerVisionPipeline
 # -----------------------------
 # KEYWORDS
 # -----------------------------
+# TODO: Сделать более гибкий поиск
 _POKER_KEYWORDS = [
     "replaypoker", "replay poker", "casino.org",
     "- nl ", "- pl ", "hold'em", "holdem", "omaha",
@@ -61,13 +63,13 @@ def get_window_rect(hwnd):
 # Overlay HUD
 # -----------------------------
 class OverlayHUD(QtWidgets.QWidget):
-    def __init__(self, hwnd):
+    def __init__(self, hwnd, room, seats):
         super().__init__()
 
         self.hwnd = hwnd
         self.pipeline_result = None
 
-        self.pipeline = PokerVisionPipeline(seats=6)
+        self.pipeline = PokerVisionPipeline(room, seats)
         self.sct = mss.mss()
 
         self.setWindowFlags(
@@ -155,6 +157,11 @@ class OverlayHUD(QtWidgets.QWidget):
 # MAIN
 # -----------------------------
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--room", default="replaypoker")
+    parser.add_argument("--seats", type=int, default=6)
+    args = parser.parse_args()
+
     app = QtWidgets.QApplication(sys.argv)
 
     hwnd = find_poker_window()
@@ -162,7 +169,7 @@ def main():
         print("Окно не найдено")
         return
 
-    overlay = OverlayHUD(hwnd)
+    overlay = OverlayHUD(hwnd, args.room, args.seats)
     overlay.show()
 
     sys.exit(app.exec())

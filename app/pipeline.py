@@ -1,42 +1,26 @@
-from domain.geometry import (
-    Rect,
-    Point,
-    compute_community_cards_zone,
-    compute_player_positions,
-    compute_player_zones
-)
+from domain.geometry import Rect
+from rooms.factory import get_room_geometry
 
 
 class PokerVisionPipeline:
-    def __init__(self, seats: int = 6):
-        self.seats = seats
+
+    def __init__(self, room: str, seats: int = 6):
+        self.geometry = get_room_geometry(room, seats)
 
     def process(self, frame):
         h, w = frame.shape[:2]
 
-        # Центр = центр окна
-        table_center = Point(w // 2, h // 2)
-
-        # Стол = всё окно
         table_rect = Rect(0, 0, w, h)
 
-        # Комьюнити карты
-        community_zone = compute_community_cards_zone(
+        table_center = self.geometry.compute_table_center(frame.shape)
+        community_zone = self.geometry.compute_community_zone(
             table_center,
             table_rect
         )
-
-        # Позиции игроков
-        player_positions = compute_player_positions(table_rect)
-
-        # Зоны игроков
-
-        player_zones = compute_player_zones(table_rect)
-
+        player_zones = self.geometry.compute_player_zones(table_rect)
 
         return {
             "table_center": table_center,
             "community_zone": community_zone,
-            "player_positions": player_positions,
             "player_zones": player_zones
         }
