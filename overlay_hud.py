@@ -9,6 +9,7 @@ import argparse
 from PyQt6 import QtWidgets, QtGui, QtCore
 
 from app.pipeline import PokerVisionPipeline
+from app.nn_client import NeuralNetClient
 
 
 # -----------------------------
@@ -70,6 +71,8 @@ class OverlayHUD(QtWidgets.QWidget):
         self.pipeline_result = None
 
         self.pipeline = PokerVisionPipeline(room, seats)
+        self.nn_client = NeuralNetClient()
+
         self.sct = mss.mss()
 
         self.setWindowFlags(
@@ -116,6 +119,20 @@ class OverlayHUD(QtWidgets.QWidget):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
         self.pipeline_result = self.pipeline.process(frame)
+
+        if self.pipeline_result is None:
+            return
+
+        comm = self.pipeline_result["community_zone"]
+
+        crop = frame[
+            comm.y1:comm.y1 + comm.height,
+            comm.x1:comm.x1 + comm.width
+        ]
+
+        nn_result = self.nn_client.predict(crop)
+        print("NN RESULT:", nn_result)
+
         self.update()
 
     def paintEvent(self, event):
