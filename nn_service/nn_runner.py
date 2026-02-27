@@ -54,6 +54,12 @@ def predict_suit(img_crop):
         _, pred = torch.max(out, 1)
     return suit_classes[pred.item()]
 
+def get_adaptive_imgsz(h, w, base_size=832, max_size=1280):
+    scale = max(h, w) / 1280
+    imgsz = int(base_size * scale)
+    imgsz = round(imgsz / 32) * 32
+    return max(640, min(imgsz, max_size))
+
 def process_image(img):
     cards = []
 
@@ -61,7 +67,7 @@ def process_image(img):
     with contextlib.redirect_stdout(f):
         results = yolo_model(
             img,
-            imgsz=416,
+            imgsz=get_adaptive_imgsz(img.shape[0], img.shape[1]),
             conf=0.25,
             verbose=False
         )

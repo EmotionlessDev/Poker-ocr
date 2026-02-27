@@ -39,16 +39,25 @@ class PokerStateManager:
                 print("Hero zone найден")
 
         if self.hero_zone:
-            # crop для карт — нижняя часть зоны
-            # берем зону целиком
+            zone = self.hero_zone
+            crop_cards = frame[zone.y1:zone.y2, zone.x1:zone.x2]
+
+            # canvas — как вход сети
             target_w, target_h = 1280, 800
-            crop_cards = frame[self.hero_zone.y1:self.hero_zone.y2, self.hero_zone.x1:self.hero_zone.x2]
-            crop_cards = cv2.resize(crop_cards, (target_w, target_h), interpolation=cv2.INTER_CUBIC)
-            cv2.imshow("Hero Crop", crop_cards)
+            canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+
+            # вставляем кроп в центр canvas
+            crop_h, crop_w = crop_cards.shape[:2]
+            x_offset = (target_w - crop_w) // 2
+            y_offset = (target_h - crop_h) // 2
+            canvas[y_offset:y_offset+crop_h, x_offset:x_offset+crop_w] = crop_cards
+
+            cv2.imshow("Hero Crop", canvas)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
-            nn_result = self.nn_client.predict(crop_cards)
-            self.table.hero_cards = [Card(rank=c["rank"], suit=c["suit"]) for c in nn_result.get("cards", [])]     
+
+            nn_result = self.nn_client.predict(canvas)
+            self.table.hero_cards = [Card(rank=c["rank"], suit=c["suit"]) for c in nn_result.get("cards", [])] 
        
 
         comm_zone = result["community_zone"]
