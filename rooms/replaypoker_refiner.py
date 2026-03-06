@@ -8,7 +8,7 @@ def refine_zone_by_dark_panel(
     zone: Rect,
     padding: int = 8,
     min_area_ratio: float = 0.05,
-) -> Rect:
+) -> Rect | None:
     """
     Уточняет зону игрока по тёмной панели внутри грубой зоны.
 
@@ -54,7 +54,7 @@ def refine_zone_by_dark_panel(
     )
 
     if not contours:
-        return zone
+        return None
 
     # --- Берём самый большой контур ---
     largest = max(contours, key=cv2.contourArea)
@@ -64,7 +64,7 @@ def refine_zone_by_dark_panel(
 
     # если контур слишком маленький — игнорируем
     if area < roi_area * min_area_ratio:
-        return zone
+        return None
 
     x, y, w_box, h_box = cv2.boundingRect(largest)
 

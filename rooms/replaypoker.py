@@ -61,7 +61,10 @@ class ReplayPokerGeometry(BaseRoomGeometry):
             refined = []
             for z in zones:
                 refined_zone = refine_zone_by_dark_panel(frame, z)
-
+                if refined_zone is None:
+                    refined.append(None)
+                    continue
+            
                 # Expand the refined zone to include the player's cards and stack
                 refined_zone = refined_zone.expand_towards(
                     target=table_center,

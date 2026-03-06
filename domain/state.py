@@ -16,6 +16,7 @@ class Player:
     position: str = ""
     is_hero: bool = False
     is_button: bool = False
+    is_active: bool = False
     cards: List[Card] = field(default_factory=list)
 
     # вспомогательные поля
