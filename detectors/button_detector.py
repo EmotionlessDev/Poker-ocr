@@ -7,6 +7,9 @@ class DealerButtonDetector:
     def __init__(self, template_path: str, threshold: float = 0.75):
 
         self.template = cv2.imread(template_path, cv2.IMREAD_COLOR)
+        if self.template is None:
+            raise ValueError(f"Failed to load button template from {template_path}")
+            
         self.template_gray = cv2.cvtColor(self.template, cv2.COLOR_BGR2GRAY)
 
         self.w = self.template.shape[1]
@@ -17,6 +20,13 @@ class DealerButtonDetector:
     def detect(self, frame):
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        fh, fw = gray.shape[:2]
+        th, tw = self.template_gray.shape[:2]
+
+        # template must be smaller than frame
+        if th > fh or tw > fw:
+            return None
 
         res = cv2.matchTemplate(
             gray,

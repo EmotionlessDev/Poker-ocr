@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
+
+from domain.geometry import Rect
 
 @dataclass
 class Card:
@@ -13,7 +15,12 @@ class Player:
     stack: float = 0.0
     position: str = ""
     is_hero: bool = False
+    is_button: bool = False
     cards: List[Card] = field(default_factory=list)
+
+    # вспомогательные поля
+    zone: Optional[Rect] = None
+    last_ocr_time: float = 0.0
 
 @dataclass
 class PokerTable:

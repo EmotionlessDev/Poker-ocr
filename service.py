@@ -37,7 +37,9 @@ def main():
             state_manager.update_from_frame(frame)
             
             # Печатаем состояние стола для отладки
-            print(state_manager.table)
+            print("Players:")
+            for p in state_manager.table.players:
+                print(f"  Seat {p.seat}: {p.nickname} {'(Hero)' if p.is_hero else ''} {'(BTN)' if p.is_button else ''} Cards: {[f'{c.rank}{c.suit}' for c in p.cards]}")
             time.sleep(0.1)
 
     except KeyboardInterrupt:
