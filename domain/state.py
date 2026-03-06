@@ -7,7 +7,15 @@ class Card:
     suit: str
 
 @dataclass
+class Player:
+    seat: int
+    nickname: str = ""
+    stack: float = 0.0
+    position: str = ""
+    is_hero: bool = False
+    cards: List[Card] = field(default_factory=list)
+
+@dataclass
 class PokerTable:
-    hero_cards: List[Card] = field(default_factory=list)  # пока пусто
-    hero_position: str = ""  # пока не определяем
+    players: List[Player] = field(default_factory=list)
     community_cards: List[Card] = field(default_factory=list)
