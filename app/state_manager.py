@@ -17,7 +17,7 @@ class PokerStateManager:
         self.nn_client = NeuralNetClient()
 
         # components
-        self.player_extractor = PlayerExtractor(hero_nickname, ocr_interval=1.0)
+        self.player_extractor = PlayerExtractor(hero_nickname, ocr_interval=2.0)  # OCR для игроков будет с интервалом в 2 секунды
         self.card_extractor = CardExtractor(self.nn_client)
         self.position_assigner = PositionAssigner()
         self.button_detector = DealerButtonDetector(button_template)

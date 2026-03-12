@@ -1,4 +1,4 @@
-import pytesseract
+import easyocr
 import re
 import time
 import cv2
@@ -11,10 +11,10 @@ class PlayerExtractor:
     def __init__(self, hero_nickname: str, ocr_interval: float = 1.0):
         self.hero_nickname = hero_nickname or ""
         self.ocr_interval = ocr_interval
+        self.reader = easyocr.Reader(['en'], gpu=True, verbose=False)
 
     def extract(self, frame, zones, players: list[Player]):
-        """Обновляет players[i].nickname, .zone, .is_hero. OCR троттлится по игроку.
-        Ники ищутся по цвету #A4A4A4 вместо жёсткого кропа."""
+        """Extract nicknames for players using OCR, with throttling per player."""
         now = time.time()
 
         for i, zone in enumerate(zones):
@@ -30,10 +30,6 @@ class PlayerExtractor:
                 p.is_active = False
                 continue
             
-            # # imshow zone
-            # cv2.imshow("Player Zone", safe_crop(frame, zone))
-            # cv2.waitKey(1)
-            
             p.is_active = True
             p.zone = zone
 
@@ -41,21 +37,17 @@ class PlayerExtractor:
             if now - p.last_ocr_time < self.ocr_interval:
                 continue
 
-            # берем всю зону игрока
+            # crop player area
             tmp_rect = zone
             crop = safe_crop(frame, tmp_rect)
             if crop is None:
                 continue
 
-            # маска для белого/серого цвета никнейма (#A4A4A4)
-            mask = self._mask_nickname_color(crop)
-
-            # сглаживание и бинаризация
-            mask = cv2.medianBlur(mask, 3)
-
             # OCR
-            text = pytesseract.image_to_string(mask, config="--psm 7")  # single line
-            nickname = text.strip()
+            result = self.reader.readtext(crop, detail=0)
+            if not result:
+                continue
+            nickname = result[0]
 
             if nickname:
                 p.nickname = nickname
@@ -65,17 +57,14 @@ class PlayerExtractor:
             # hero detection fuzzy
             if self._is_hero(nickname):
                 p.is_hero = True
+            
+            print(f"Extracted player {p.seat}: '{p.nickname}' (Hero: {p.is_hero})")
 
-    def _mask_nickname_color(self, crop):
-        """Возвращает бинарную маску пикселей цвета никнейма (#A4A4A4)."""
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        # диапазон для "серого/белого" с небольшой погрешностью
-        lower = np.array([0, 0, 160])   # H,S,V
-        upper = np.array([180, 50, 180])
-        mask = cv2.inRange(hsv, lower, upper)
-        return mask
+    def _is_hero(self, nickname):
+        if not self.hero_nickname:
+            return False
 
-    def _is_hero(self, nickname: str):
-        text_clean = re.sub(r'\W+', '', (nickname or "")).lower()
-        hero_clean = re.sub(r'\W+', '', (self.hero_nickname or "")).lower()
-        return hero_clean != "" and hero_clean in text_clean
+        clean_nick = re.sub(r"\s+", "", nickname).lower()
+        clean_hero = re.sub(r"\s+", "", self.hero_nickname).lower()
+
+        return clean_nick == clean_hero

@@ -75,9 +75,9 @@ shellingham==1.5.4
 six==1.17.0
 sympy==1.14.0
 tifffile==2026.3.3
-torch==2.2.2+cpu
-torchaudio==2.2.2+cpu
-torchvision==0.17.2+cpu
+torch==2.7.1+cu118
+torchaudio==2.7.1+cu118
+torchvision==0.22.1+cu118
 tqdm==4.67.3
 typer-slim==0.21.1
 typing-inspection==0.4.2
