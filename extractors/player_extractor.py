@@ -1,67 +1,92 @@
 import easyocr
 import re
 import time
-import cv2
-import numpy as np
+
 from utils.image_utils import safe_crop
 from domain.state import Player
-from domain.geometry import Rect
+
 
 class PlayerExtractor:
-    def __init__(self, hero_nickname: str, ocr_interval: float = 1.0):
+
+    def __init__(
+        self,
+        hero_nickname: str,
+        seat_detector,
+        nickname_extractor,
+        ocr_interval: float = 2.0,
+    ):
         self.hero_nickname = hero_nickname or ""
         self.ocr_interval = ocr_interval
-        self.reader = easyocr.Reader(['en'], gpu=True, verbose=False)
+
+        self.reader = easyocr.Reader(["en"], gpu=True, verbose=False)
+
+        self.seat_detector = seat_detector
+        self.nickname_extractor = nickname_extractor
 
     def extract(self, frame, zones, players: list[Player]):
-        """Extract nicknames for players using OCR, with throttling per player."""
+        """
+        Extract player data from frame.
+        """
+
         now = time.time()
 
-        for i, zone in enumerate(zones):
-            if i >= len(players):
+        for i, player in enumerate(players):
+
+            if i >= len(zones):
                 break
 
-            p = players[i]
+            zone = zones[i]
 
-            if zone is None:
-                p.zone = None
-                p.nickname = ""
-                p.is_hero = False
-                p.is_active = False
-                continue
-            
-            p.is_active = True
-            p.zone = zone
-
-            # throttle OCR per player
-            if now - p.last_ocr_time < self.ocr_interval:
+            # --- invalid zone
+            if zone is None or zone.width <= 0 or zone.height <= 0:
+                self._reset_player(player)
                 continue
 
-            # crop player area
-            tmp_rect = zone
-            crop = safe_crop(frame, tmp_rect)
+            player.zone = zone
+
+            # --- OCR throttling
+            if now - player.last_ocr_time < self.ocr_interval:
+                continue
+
+            crop = safe_crop(frame, zone)
+
             if crop is None:
+                self._reset_player(player)
                 continue
 
-            # OCR
-            result = self.reader.readtext(crop, detail=0)
-            if not result:
+            # --- run OCR once
+            texts = self.reader.readtext(crop, detail=0)
+
+            # --- detect seat state
+            is_active = self.seat_detector.detect(texts)
+
+            if not is_active:
+                self._reset_player(player)
+                player.last_ocr_time = now
                 continue
-            nickname = result[0]
+
+            player.is_active = True
+
+            # --- nickname extraction
+            nickname = self.nickname_extractor.extract(texts)
 
             if nickname:
-                p.nickname = nickname
+                player.nickname = nickname
 
-            p.last_ocr_time = now
+            # --- hero detection
+            player.is_hero = self._is_hero(player.nickname)
 
-            # hero detection fuzzy
-            if self._is_hero(nickname):
-                p.is_hero = True
-            
-            print(f"Extracted player {p.seat}: '{p.nickname}' (Hero: {p.is_hero})")
+            player.last_ocr_time = now
 
-    def _is_hero(self, nickname):
-        if not self.hero_nickname:
+    def _reset_player(self, player: Player):
+        """Reset player state."""
+        player.is_active = False
+        player.nickname = ""
+        player.is_hero = False
+        player.zone = None
+
+    def _is_hero(self, nickname: str) -> bool:
+        if not nickname or not self.hero_nickname:
             return False
 
         clean_nick = re.sub(r"\s+", "", nickname).lower()

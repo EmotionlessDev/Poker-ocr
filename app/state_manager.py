@@ -8,6 +8,8 @@ from detectors.button_detector import DealerButtonDetector
 from extractors.player_extractor import PlayerExtractor
 from extractors.card_extractor import CardExtractor
 from services.position_assigner import PositionAssigner
+from detectors.seat_state_detector import SeatStateDetector
+from extractors.nickname_extractor import NicknameExtractor
 
 import numpy as np
 
@@ -17,7 +19,9 @@ class PokerStateManager:
         self.nn_client = NeuralNetClient()
 
         # components
-        self.player_extractor = PlayerExtractor(hero_nickname, ocr_interval=2.0)  # OCR для игроков будет с интервалом в 2 секунды
+        self.seat_detector = SeatStateDetector()
+        self.nickname_extractor = NicknameExtractor()
+        self.player_extractor = PlayerExtractor(hero_nickname, self.seat_detector, self.nickname_extractor)
         self.card_extractor = CardExtractor(self.nn_client)
         self.position_assigner = PositionAssigner()
         self.button_detector = DealerButtonDetector(button_template)

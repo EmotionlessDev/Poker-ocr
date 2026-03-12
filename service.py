@@ -37,10 +37,10 @@ def main():
             state_manager.update_from_frame(frame)
             
             # Печатаем состояние стола для отладки
-            # print("Players:")
-            # for p in state_manager.table.players:
-            #     print(f"  Seat {p.seat}: {p.nickname}, Position: {p.position}")
-            # time.sleep(0.1)
+            print("Players:")
+            for p in state_manager.table.players:
+                print(f"seat {p.seat}: (Hero: {p.is_hero}, Button: {p.is_button}, Active: {p.is_active})")
+            time.sleep(4)
 
     except KeyboardInterrupt:
         pass
