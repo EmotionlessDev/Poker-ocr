@@ -39,7 +39,7 @@ def main():
             # Печатаем состояние стола для отладки
             print("Players:")
             for p in state_manager.table.players:
-                print(f"seat {p.seat}: (Hero: {p.is_hero}, Button: {p.is_button}, Active: {p.is_active})")
+                print(f"seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, Nickname: {p.nickname}, Active: {p.is_active})")
             time.sleep(4)
 
     except KeyboardInterrupt:

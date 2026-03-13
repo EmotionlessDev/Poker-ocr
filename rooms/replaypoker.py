@@ -28,9 +28,9 @@ class ReplayPokerGeometry(BaseRoomGeometry):
 
     def compute_player_zones(self, table_rect, frame=None):
         table_center = self.compute_table_center(frame.shape)
-
+      
         seat_ratios = [
-            (0.68, 0.67),
+            (0.68, 0.67), 
             (0.81, 0.46),
             (0.68, 0.25),
             (0.32, 0.25),

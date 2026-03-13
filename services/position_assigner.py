@@ -1,43 +1,49 @@
+POSITIONS = {
+    6: ["BU", "SB", "BB", "UTG", "MP", "CO"],
+    5: ["BU", "SB", "BB", "MP", "CO"],
+    4: ["BU", "SB", "BB", "CO"],
+    3: ["BU", "SB", "BB"],
+    2: ["SB", "BB"],
+}
+
+
 class PositionAssigner:
-
-    def __init__(self):
-
-        # позиции для 6max
-        self.positions_map = {
-            0: "BTN",
-            1: "SB",
-            2: "BB",
-            3: "UTG",
-            4: "MP",
-            5: "CO"
-        }
 
     def assign(self, players):
 
-        # только активные игроки
-        active = [p for p in players if p.is_active]
+        # очистить старые позиции
+        for p in players:
+            p.position = ""
 
-        if not active:
+        button = next((p for p in players if p.is_button), None)
+
+        if button is None:
             return
 
-        btn_index = None
+        seats = len(players)
 
-        for i, p in enumerate(active):
-            if p.is_button:
-                btn_index = i
-                break
+        # порядок игроков начиная с BU
+        order = []
 
-        if btn_index is None:
+        for i in range(seats):
+
+            seat = (button.seat - i) % seats
+            player = players[seat]
+
+            if player.is_active:
+                order.append(player)
+
+        active_count = len(order)
+
+        if active_count < 2:
             return
 
-        n = len(active)
+        positions = POSITIONS.get(active_count)
 
-        for i, p in enumerate(active):
+        if not positions:
+            return
 
-            pos_index = (i - btn_index) % n
+        for i, player in enumerate(order):
 
-            # если игроков меньше чем 6 — просто берём первые позиции
-            if pos_index in self.positions_map:
-                p.position = self.positions_map[pos_index]
-            else:
-                p.position = ""
+            if i < len(positions):
+                player.position = positions[i]
