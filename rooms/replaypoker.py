@@ -77,7 +77,38 @@ class ReplayPokerGeometry(BaseRoomGeometry):
 
 
             zones= refined
+            return zones
 
-  
+    def compute_bet_zones(self, player_zones, table_center) -> list[Rect]:
+        bet_zones = []
 
-        return zones
+        for zone in player_zones:
+            if zone is None:
+                bet_zones.append(None)
+                continue
+
+            px = (zone.x1 + zone.x2) // 2
+            py = (zone.y1 + zone.y2) // 2
+
+            # --- смещение только по X (в центр)
+            if px < table_center.x:
+                # игрок слева → двигаем вправо
+                cx = px + 110
+            else:
+                # игрок справа → двигаем влево
+                cx = px - 110
+
+            # --- Y почти не трогаем
+            cy = py
+
+            w = 160
+            h = 100
+
+            bet_zones.append(Rect(
+                cx - w // 2,
+                cy - h // 2,
+                cx + w // 2,
+                cy + h // 2
+            ))
+
+        return bet_zones

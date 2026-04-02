@@ -18,9 +18,11 @@ class PokerVisionPipeline:
             table_rect
         )
         player_zones = self.geometry.compute_player_zones(table_rect, frame=frame)
+        bet_zones = self.geometry.compute_bet_zones(player_zones, table_center)
 
         return {
             "table_center": table_center,
             "community_zone": community_zone,
-            "player_zones": player_zones
+            "player_zones": player_zones,
+            "bet_zones": bet_zones
         }

@@ -1,4 +1,3 @@
-# app/state_manager.py
 import time
 from domain.state import Player, PokerTable
 from app.pipeline import PokerVisionPipeline
@@ -10,6 +9,7 @@ from extractors.card_extractor import CardExtractor
 from services.position_assigner import PositionAssigner
 from detectors.seat_state_detector import SeatStateDetector
 from extractors.nickname_extractor import NicknameExtractor
+from extractors.bet_extractor import BetExtractor
 
 import numpy as np
 
@@ -25,6 +25,7 @@ class PokerStateManager:
         self.card_extractor = CardExtractor(self.nn_client)
         self.position_assigner = PositionAssigner()
         self.button_detector = DealerButtonDetector(button_template)
+        self.bet_extractor = BetExtractor()
 
         # state
         self.table = PokerTable(players=[Player(seat=i) for i in range(seats)])
@@ -40,6 +41,7 @@ class PokerStateManager:
 
         player_zones = result.get("player_zones", [])
         comm_zone = result.get("community_zone")
+        bet_zones = result.get("bet_zones", [])
 
         # 1) update players (OCR throttled inside extractor)
         self.player_extractor.extract(frame, player_zones, self.table.players)
@@ -60,6 +62,12 @@ class PokerStateManager:
         # 5) community cards
         if comm_zone is not None:
             self.table.community_cards = self.card_extractor.extract_board(frame, comm_zone)
+        # 6) bets
+        for p, bet_zone in zip(self.table.players, bet_zones):
+            if bet_zone is not None and p.is_active:
+                p.last_bet = self.bet_extractor.extract(frame, bet_zone)
+
+
 
     def _assign_button_to_closest_player(self, center):
         bx, by = center

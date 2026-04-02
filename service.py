@@ -39,7 +39,7 @@ def main():
             # Печатаем состояние стола для отладки
             print("Players:")
             for p in state_manager.table.players:
-                print(f"seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, Nickname: {p.nickname}, Active: {p.is_active})")
+                print(f"seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, Nickname: {p.nickname}, Active: {p.is_active}), Last Bet: {p.last_bet})")
             print(f"Community cards: {state_manager.table.community_cards}")
             print(f"Hero cards: {next((p.cards for p in state_manager.table.players if p.is_hero), [])}")
             time.sleep(4)
