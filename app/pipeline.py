@@ -26,3 +26,7 @@ class PokerVisionPipeline:
             "player_zones": player_zones,
             "bet_zones": bet_zones
         }
+    
+    def get_table_info(self, hwnd: int) -> dict:
+        """Получает информацию о столе (блайнды, название) из заголовка окна"""
+        return self.geometry.get_table_info_from_hwnd(hwnd)

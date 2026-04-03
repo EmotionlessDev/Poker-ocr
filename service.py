@@ -22,30 +22,45 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--room", default="replaypoker")
     parser.add_argument("--seats", type=int, default=6)
+    parser.add_argument("--hero", default="Elots")  # ➕ ник героя из аргументов
     args = parser.parse_args()
 
     hwnd = find_poker_window()
     if not hwnd:
-        print("Окно не найдено")
+        print("❌ Окно не найдено")
         return
+    
+    # ➕ Показываем заголовок окна для отладки
+    title = win32gui.GetWindowText(hwnd)
+    print(f"✅ Найдено окно: {title}")
 
-    state_manager = PokerStateManager(args.room, args.seats, hero_nickname="Elots")  # TODO: получать ник героя от пользователя
+    # ➕ Передаём hwnd в state_manager
+    state_manager = PokerStateManager(
+        room=args.room, 
+        seats=args.seats, 
+        hero_nickname=args.hero,
+        hwnd=hwnd
+    )
 
     try:
         while True:
             frame = capture_window(hwnd)
             state_manager.update_from_frame(frame)
+            if state_manager.table.community_cards:
+                continue  # Пока фокус на префлопе для теста
             
             # Печатаем состояние стола для отладки
             print("Players:")
             for p in state_manager.table.players:
-                print(f"seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, Nickname: {p.nickname}, Active: {p.is_active}), Last Bet: {p.last_bet})")
+                print(f"  seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, Nickname: {p.nickname}, Active: {p.is_active}, Bet: {p.last_bet})")
             print(f"Community cards: {state_manager.table.community_cards}")
             print(f"Hero cards: {next((p.cards for p in state_manager.table.players if p.is_hero), [])}")
+            print("=" * 50)
+            
             time.sleep(4)
 
     except KeyboardInterrupt:
-        pass
+        print("\n👋 Stopped by user")
 
 if __name__ == "__main__":
     main()

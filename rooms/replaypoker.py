@@ -1,8 +1,11 @@
 from domain.geometry import Rect, Point
 from .base import BaseRoomGeometry
 from .replaypoker_refiner import refine_zone_by_dark_panel, find_bet_panel_in_zone
+import win32gui
+import re
 
 class ReplayPokerGeometry(BaseRoomGeometry):
+    BLIND_PATTERN = r'(\d+)/(\d+)\s*-\s*NL\s*Holdem'
 
     def compute_table_center(self, frame_shape):
         h, w = frame_shape[:2]
@@ -155,3 +158,39 @@ class ReplayPokerGeometry(BaseRoomGeometry):
                 bet_zones.append(base_bet_zone)
 
         return bet_zones
+
+    def get_table_info_from_hwnd(self, hwnd: int) -> dict:
+        """
+        Извлекает информацию о столе из заголовка окна.
+        Возвращает: {"small_blind": 100, "big_blind": 200, "table_name": "...", "valid": True}
+        """
+        try:
+            title = win32gui.GetWindowText(hwnd)
+        except Exception as e:
+            print(f"Error getting window title: {e}")
+            return {"valid": False}
+        
+        if not title:
+            return {"valid": False}
+        
+        # Парсим блайнды
+        match = re.search(self.BLIND_PATTERN, title, re.IGNORECASE)
+        
+        if match:
+            sb = float(match.group(1))
+            bb = float(match.group(2))
+            
+            # Парсим название стола (опционально)
+            parts = title.split(' - ')
+            table_name = parts[1].strip() if len(parts) >= 3 else ""
+            stakes_level = parts[0].strip() if len(parts) >= 1 else ""
+            
+            return {
+                "small_blind": sb,
+                "big_blind": bb,
+                "table_name": table_name,
+                "stakes_level": stakes_level,
+                "valid": True
+            }
+        
+        return {"valid": False}

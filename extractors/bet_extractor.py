@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import easyocr
 import re
+import time
 
 from utils.image_utils import safe_crop
 
@@ -18,6 +19,10 @@ class BetExtractor:
         crop = safe_crop(frame, zone)
         if crop is None:
             return None
+        
+        # save for debug
+        timestamp = int(time.time() * 1000)
+        cv2.imwrite(f"./debug/bet_zone_{timestamp}.png", crop)
 
         processed = self._preprocess(crop)
 
