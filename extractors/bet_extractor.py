@@ -78,3 +78,19 @@ class BetExtractor:
 
         return crop[y:y+h, x:x+w]
     
+    def _parse_amount(self, texts: list[str]) -> float | None:
+            for text in texts:
+                text = text.replace(",", "")
+                text = text.replace("S", "5")
+                text = text.replace("I", "1")
+                text = text.replace("|", "1")
+                text = text.replace("O", "0")
+
+                match = re.search(r"\d+(\.\d+)?", text)
+                if match:
+                    try:
+                        return float(match.group())
+                    except:
+                        continue
+            return None
+    
