@@ -68,7 +68,6 @@ class PokerStateManager:
                 p.last_bet = self.bet_extractor.extract(frame, bet_zone)
 
 
-
     def _assign_button_to_closest_player(self, center):
         bx, by = center
         best = None

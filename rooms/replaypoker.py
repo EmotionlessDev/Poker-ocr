@@ -1,6 +1,6 @@
 from domain.geometry import Rect, Point
 from .base import BaseRoomGeometry
-from .replaypoker_refiner import refine_zone_by_dark_panel
+from .replaypoker_refiner import refine_zone_by_dark_panel, find_bet_panel_in_zone
 
 class ReplayPokerGeometry(BaseRoomGeometry):
 
@@ -79,7 +79,45 @@ class ReplayPokerGeometry(BaseRoomGeometry):
             zones= refined
             return zones
 
-    def compute_bet_zones(self, player_zones, table_center) -> list[Rect]:
+    # def compute_bet_zones(self, player_zones, table_center) -> list[Rect]:
+    #     bet_zones = []
+
+    #     for zone in player_zones:
+    #         if zone is None:
+    #             bet_zones.append(None)
+    #             continue
+
+    #         px = (zone.x1 + zone.x2) // 2
+    #         py = (zone.y1 + zone.y2) // 2
+
+    #         # --- смещение только по X (в центр)
+    #         if px < table_center.x:
+    #             # игрок слева → двигаем вправо
+    #             cx = px + 110
+    #         else:
+    #             # игрок справа → двигаем влево
+    #             cx = px - 110
+
+    #         # --- Y почти не трогаем
+    #         cy = py
+
+    #         w = 160
+    #         h = 100
+
+    #         bet_zones.append(Rect(
+    #             cx - w // 2,
+    #             cy - h // 2,
+    #             cx + w // 2,
+    #             cy + h // 2
+    #         ))
+
+    #     return bet_zones
+    
+    def compute_bet_zones(self, player_zones, table_center, frame=None) -> list[Rect]:
+        """
+        Вычисляет зоны для ставок.
+        Если передан frame, то находит конкретные панели со ставками.
+        """
         bet_zones = []
 
         for zone in player_zones:
@@ -90,25 +128,30 @@ class ReplayPokerGeometry(BaseRoomGeometry):
             px = (zone.x1 + zone.x2) // 2
             py = (zone.y1 + zone.y2) // 2
 
-            # --- смещение только по X (в центр)
+            # Смещение только по X (в центр)
             if px < table_center.x:
-                # игрок слева → двигаем вправо
                 cx = px + 110
             else:
-                # игрок справа → двигаем влево
                 cx = px - 110
 
-            # --- Y почти не трогаем
             cy = py
 
             w = 160
             h = 100
 
-            bet_zones.append(Rect(
+            # Базовая зона (примерная)
+            base_bet_zone = Rect(
                 cx - w // 2,
                 cy - h // 2,
                 cx + w // 2,
                 cy + h // 2
-            ))
+            )
+
+            # Если есть frame, уточняем зону (ищем тёмную панель)
+            if frame is not None:
+                refined_bet_zone = find_bet_panel_in_zone(frame, base_bet_zone)
+                bet_zones.append(refined_bet_zone)
+            else:
+                bet_zones.append(base_bet_zone)
 
         return bet_zones

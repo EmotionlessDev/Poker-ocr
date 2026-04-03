@@ -84,3 +84,52 @@ def refine_zone_by_dark_panel(
     )
 
     return refined
+
+def find_bet_panel_in_zone(frame, zone):
+    """Находит панель со ставкой (тёмный прямоугольник с цифрами)"""
+    if zone is None:
+        return None
+
+    x1, y1, x2, y2 = zone.x1, zone.y1, zone.x2, zone.y2
+    h, w = frame.shape[:2]
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(w, x2), min(h, y2)
+
+    if x2 <= x1 or y2 <= y1:
+        return None
+
+    crop = frame[y1:y2, x1:x2]
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+
+    # Тёмные цвета (плашка ставки)
+    lower = np.array([0, 0, 0])
+    upper = np.array([180, 255, 60])
+    mask = cv2.inRange(hsv, lower, upper)
+
+    # Сглаживаем
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    contours, _ = cv2.findContours(
+        mask,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    if not contours:
+        return None
+
+    # Берём самый большой тёмный прямоугольник
+    best = max(contours, key=cv2.contourArea)
+    bx, by, bw, bh = cv2.boundingRect(best)
+
+    # Фильтр — чтобы не схватить весь стол
+    if bw < 25 or bh < 10:
+        return None
+
+    return Rect(
+        x1 + bx,
+        y1 + by,
+        x1 + bx + bw,
+        y1 + by + bh
+    )
