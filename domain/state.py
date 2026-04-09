@@ -48,6 +48,9 @@ class PokerTable:
     players: List[Player] = field(default_factory=list)
     community_cards: List[Card] = field(default_factory=list)
     
+    is_hero_turn: bool = False
+    last_hero_turn_check: float = 0.0
+
     # Блайнды
     small_blind: float = 0.0
     big_blind: float = 0.0

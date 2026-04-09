@@ -21,8 +21,8 @@ class BetExtractor:
             return None
         
         # save for debug
-        timestamp = int(time.time() * 1000)
-        cv2.imwrite(f"./debug/bet_zone_{timestamp}.png", crop)
+        # timestamp = int(time.time() * 1000)
+        # cv2.imwrite(f"./debug/bet_zone_{timestamp}.png", crop)
 
         processed = self._preprocess(crop)
 

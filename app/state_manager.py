@@ -3,6 +3,7 @@ from domain.state import Player, PokerTable, PreflopActionInfo
 from app.pipeline import PokerVisionPipeline
 from app.nn_client import NeuralNetClient
 from detectors.button_detector import DealerButtonDetector
+from detectors.hero_turn_detector import HeroTurnDetector  # ➕ импорт
 from extractors.player_extractor import PlayerExtractor
 from extractors.card_extractor import CardExtractor
 from services.position_assigner import PositionAssigner
@@ -27,6 +28,7 @@ class PokerStateManager:
         self.position_assigner = PositionAssigner()
         self.button_detector = DealerButtonDetector(button_template)
         self.bet_extractor = BetExtractor()
+        self.hero_turn_detector = HeroTurnDetector()  # ➕ детектор очереди
 
         # state
         self.table = PokerTable(players=[Player(seat=i) for i in range(seats)])
@@ -45,7 +47,7 @@ class PokerStateManager:
         comm_zone = result.get("community_zone")
         bet_zones = result.get("bet_zones", [])
 
-        # ➕ Проверяем блайнды (раз в 5 секунд)
+        # Проверяем блайнды (раз в 5 секунд)
         current_time = time.time()
         if current_time - self.last_blinds_check > 5.0:
             self._update_blinds_from_hwnd()
@@ -70,16 +72,50 @@ class PokerStateManager:
         # 5) community cards
         if comm_zone is not None:
             self.table.community_cards = self.card_extractor.extract_board(frame, comm_zone)
+        
+        # 6) Проверяем, дошла ли очередь до героя
+        self.table.is_hero_turn = self.hero_turn_detector.detect(frame)
+        
+        # ✅ 7) Если очередь героя - парсим и показываем инфу
+        if self.table.is_hero_turn:
+            self._parse_bets_on_hero_turn(frame, bet_zones, current_time)
             
-        # 6) bets
-        for p, bet_zone in zip(self.table.players, bet_zones):
-            if bet_zone is not None and p.is_active:
-                p.last_bet = self.bet_extractor.extract(frame, bet_zone)
+            # Анализируем префлоп (если префлоп)
+            if self.table.street == "preflop" and not self.table.community_cards:
+                analyze_preflop(self.table)
+                self._debug_preflop_action()
+            else:
+                # ✅ Показываем состояние даже на постфлопе
+                self._print_hero_turn_state()
+        else:
+            # Сбрасываем ставки неактивных игроков
+            self._clear_stale_bets(current_time)
 
-        # 7) Анализируем префлоп-экшен (НЕТУ КАРТ НА СТОЛЕ)
-        if self.table.street == "preflop" and self.table.community_cards == []:
-            analyze_preflop(self.table)
-            self._debug_preflop_action()
+    def _parse_bets_on_hero_turn(self, frame, bet_zones, current_time):
+        """Парсит ставки когда очередь героя"""
+        for p, bet_zone in zip(self.table.players, bet_zones):
+            if not p.is_active:
+                continue
+            
+            if bet_zone is not None:
+                bet = self.bet_extractor.extract(frame, bet_zone)
+                if bet is not None and bet > 0:
+                    p.last_bet = bet
+                    p.last_bet_seen_time = current_time
+                else:
+                    p.last_bet = 0.0
+            else:
+                p.last_bet = 0.0
+
+    def _clear_stale_bets(self, current_time):
+        """Сбрасывает устаревшие ставки (если очередь не героя)"""
+        BET_TIMEOUT = 3.0  # секунды
+        
+        for p in self.table.players:
+            if hasattr(p, 'last_bet_seen_time'):
+                if current_time - p.last_bet_seen_time > BET_TIMEOUT:
+                    if p.last_bet > 0:
+                        p.last_bet = 0.0
 
     def _update_blinds_from_hwnd(self):
         """Обновляет блайнды из заголовка окна через pipeline"""
@@ -123,7 +159,8 @@ class PokerStateManager:
         """Вывод информации о префлопе (для отладки)"""
         info = self.table.preflop_action
         
-        print(f"\n📊 Preflop Analysis (Blinds: {self.table.blinds_str})")
+        hero_turn_str = "🟢 HERO TURN" if self.table.is_hero_turn else "⏳ Waiting"
+        print(f"\n📊 Preflop Analysis (Blinds: {self.table.blinds_str}) [{hero_turn_str}]")
         
         if info.is_open_raise:
             print("   Status: Hero opens first")
@@ -142,6 +179,27 @@ class PokerStateManager:
                 print(f"   Callers: {info.callers}")
         
         if info.hero_to_call_bb > 0:
-            print(f"   Hero needs to call: {info.hero_to_call_bb:.1f}BB")
+            print(f"   ⚠️ Hero needs to call: {info.hero_to_call_bb:.1f}BB")
         
         print("-" * 50)
+    
+    def _print_hero_turn_state(self):
+        """Вывод состояния когда очередь героя"""
+        print(f"\n🟢 HERO TURN - Street: {self.table.street}")
+        
+        # Игроки
+        print("Players:")
+        for p in self.table.players:
+            if p.is_active:
+                hero_mark = "🦸" if p.is_hero else ""
+                print(f"  {hero_mark} Seat {p.seat}: {p.nickname} "
+                    f"(Pos: {p.position}, Bet: {p.last_bet})")
+        
+        # Карты
+        print(f"Community: {[c.rank+c.suit for c in self.table.community_cards]}")
+        
+        hero = next((p for p in self.table.players if p.is_hero), None)
+        if hero and hero.cards:
+            print(f"Hero cards: {[c.rank+c.suit for c in hero.cards]}")
+        
+        print("=" * 50)

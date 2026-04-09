@@ -46,18 +46,27 @@ def main():
         while True:
             frame = capture_window(hwnd)
             state_manager.update_from_frame(frame)
-            if state_manager.table.community_cards:
-                continue  # Пока фокус на префлопе для теста
             
-            # Печатаем состояние стола для отладки
-            print("Players:")
-            for p in state_manager.table.players:
-                print(f"  seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, Nickname: {p.nickname}, Active: {p.is_active}, Bet: {p.last_bet})")
-            print(f"Community cards: {state_manager.table.community_cards}")
-            print(f"Hero cards: {next((p.cards for p in state_manager.table.players if p.is_hero), [])}")
-            print("=" * 50)
+            # ✅ Показываем инфу ТОЛЬКО когда очередь героя
+            if state_manager.table.is_hero_turn:
+                hero_turn_icon = "🟢"
+                print(f"\n{hero_turn_icon} Hero turn: {state_manager.table.is_hero_turn}")
+                
+                # Печатаем состояние стола
+                print("Players:")
+                for p in state_manager.table.players:
+                    print(f"  seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, "
+                        f"Nickname: {p.nickname}, Active: {p.is_active}, Bet: {p.last_bet})")
+                print(f"Community cards: {state_manager.table.community_cards}")
+                print(f"Hero cards: {next((p.cards for p in state_manager.table.players if p.is_hero), [])}")
+                print("=" * 50)
+            else:
+                # Когда не очередь - просто точка или ничего
+                print(".", end="", flush=True)
+                time.sleep(0.5)
+                continue
             
-            time.sleep(4)
+            time.sleep(1)
 
     except KeyboardInterrupt:
         print("\n👋 Stopped by user")
