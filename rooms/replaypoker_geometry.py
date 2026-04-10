@@ -1,5 +1,5 @@
 from domain.geometry import Rect, Point
-from .base import BaseRoomGeometry
+from .base_geometry import BaseRoomGeometry
 from .replaypoker_refiner import refine_zone_by_dark_panel, find_bet_panel_in_zone
 import win32gui
 import re

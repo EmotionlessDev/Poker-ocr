@@ -22,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--room", default="replaypoker")
     parser.add_argument("--seats", type=int, default=6)
-    parser.add_argument("--hero", default="Elots")  # ➕ ник героя из аргументов
+    parser.add_argument("--hero", default="Elots")
     args = parser.parse_args()
 
     hwnd = find_poker_window()
@@ -30,13 +30,11 @@ def main():
         print("❌ Окно не найдено")
         return
     
-    # ➕ Показываем заголовок окна для отладки
     title = win32gui.GetWindowText(hwnd)
     print(f"✅ Найдено окно: {title}")
 
-    # ➕ Передаём hwnd в state_manager
     state_manager = PokerStateManager(
-        room=args.room, 
+        room_name=args.room, 
         seats=args.seats, 
         hero_nickname=args.hero,
         hwnd=hwnd
@@ -47,7 +45,7 @@ def main():
             frame = capture_window(hwnd)
             state_manager.update_from_frame(frame)
             
-            # ✅ Показываем инфу ТОЛЬКО когда очередь героя
+            # Показываем Debug инфу ТОЛЬКО когда очередь героя
             if state_manager.table.is_hero_turn:
                 hero_turn_icon = "🟢"
                 print(f"\n{hero_turn_icon} Hero turn: {state_manager.table.is_hero_turn}")
@@ -61,7 +59,6 @@ def main():
                 print(f"Hero cards: {next((p.cards for p in state_manager.table.players if p.is_hero), [])}")
                 print("=" * 50)
             else:
-                # Когда не очередь - просто точка или ничего
                 print(".", end="", flush=True)
                 time.sleep(0.5)
                 continue
@@ -69,7 +66,7 @@ def main():
             time.sleep(1)
 
     except KeyboardInterrupt:
-        print("\n👋 Stopped by user")
+        print("\nStopped by user")
 
 if __name__ == "__main__":
     main()

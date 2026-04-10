@@ -1,11 +1,11 @@
 from domain.geometry import Rect
-from rooms.factory import get_room_geometry
+from rooms.factory import get_room_geometry_class
 
 
 class PokerVisionPipeline:
 
     def __init__(self, room: str, seats: int = 6):
-        self.geometry = get_room_geometry(room, seats)
+        self.geometry = get_room_geometry_class(room, seats)
 
     def process(self, frame):
         h, w = frame.shape[:2]
