@@ -89,10 +89,8 @@ def refine_zone_by_dark_panel(
 
 def find_bet_panel_in_zone(frame, zone):
     """
-    Находит панель со ставкой по комбинации признаков:
-    - Тёмный фон
-    - Яркие цифры внутри
-    - Определённый aspect ratio
+    Находит панель со ставкой.
+    Если avatar_zone передан — используем как fallback.
     """
     if zone is None:
         return None
@@ -106,126 +104,111 @@ def find_bet_panel_in_zone(frame, zone):
         return None
 
     crop = frame[y1:y2, x1:x2]
+    crop_area = crop.shape[0] * crop.shape[1]
     
-    # === 1. Ищем тёмные области (фон панели) ===
-    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    # === 1. ГРАДИЕНТНАЯ маска (лучше для тёмных панелей) ===
+    # Полупрозрачный чёрный лучше детектится через градиенты
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     
-    # Тёмные цвета (плашка)
-    lower_dark = np.array([0, 0, 0])
-    upper_dark = np.array([180, 255, 80])  # Немного ярче
-    mask_dark = cv2.inRange(hsv, lower_dark, upper_dark)
+    # Тёмные области (адаптивный порог)
+    _, mask_dark = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY_INV)
     
-    # === 2. Ищем яркие области (цифры) ===
-    # Белые/светлые цифры
-    lower_bright = np.array([0, 0, 200])
-    upper_bright = np.array([180, 20, 255])
-    mask_bright = cv2.inRange(hsv, lower_bright, upper_bright)
+    # Белые цифры (яркие)
+    _, mask_bright = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
     
-    # Морфология для цифр
-    kernel_small = np.ones((2, 2), np.uint8)
-    mask_bright = cv2.morphologyEx(mask_bright, cv2.MORPH_CLOSE, kernel_small)
-    mask_bright = cv2.dilate(mask_bright, kernel_small, iterations=1)
-    
-    # === 3. Ищем контуры тёмных областей ===
-    kernel = np.ones((5, 5), np.uint8)
+    # Морфология
+    kernel = np.ones((3, 3), np.uint8)
     mask_dark = cv2.morphologyEx(mask_dark, cv2.MORPH_CLOSE, kernel)
+    mask_bright = cv2.dilate(mask_bright, kernel, iterations=1)
     
+    # === 2. Ищем контуры ===
     contours, _ = cv2.findContours(
-        mask_dark,
-        cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE
+        mask_dark, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
 
     if not contours:
         return None
 
-    # === 4. Фильтруем контуры ===
+    # === 3. АДАПТИВНАЯ фильтрация ===
     candidates = []
-    crop_area = crop.shape[0] * crop.shape[1]
     
     for cnt in contours:
         bx, by, bw, bh = cv2.boundingRect(cnt)
         area = cv2.contourArea(cnt)
         
-        # Фильтр по размеру
-        if area < crop_area * 0.02 or area > crop_area * 0.5:
+        # Более мягкие фильтры
+        if area < crop_area * 0.01 or area > crop_area * 0.6:
             continue
         
-        if bw < 30 or bh < 15:
+        # Минимальный размер (меньше для "4")
+        if bw < 20 or bh < 10:
             continue
         
-        # Aspect ratio (панель обычно шире чем высокая)
+        # АДАПТИВНЫЙ aspect ratio
+        # "4" → ~1.5-2.5, "100" → ~3-5, "2443" → ~4-6
         aspect_ratio = bw / float(bh)
-        if aspect_ratio < 1.2 or aspect_ratio > 4.0:
+        if aspect_ratio < 1.0 or aspect_ratio > 6.0:
             continue
         
-        # === 5. Проверяем наличие ярких цифр внутри ===
-        # Берём ROI тёмной области
-        roi_x, roi_y = max(0, bx - 5), max(0, by - 5)
-        roi_w, roi_h = min(crop.shape[1] - roi_x, bw + 10), min(crop.shape[0] - roi_y, bh + 10)
+        # === 4. Проверка белых цифр ===
+        roi_x, roi_y = max(0, bx), max(0, by)
+        roi_w, roi_h = min(crop.shape[1] - bx, bw), min(crop.shape[0] - by, bh)
         
         bright_roi = mask_bright[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w]
         bright_pixels = cv2.countNonZero(bright_roi)
+        roi_area = roi_w * roi_h
         
-        # Должно быть достаточно ярких пикселей (цифры)
-        if bright_pixels < 20:  # Минимум цифр
+        # Адаптивный порог (для "4" нужно меньше)
+        min_bright = max(8, int(roi_area * 0.02))
+        if bright_pixels < min_bright:
             continue
         
-        # Яркие пиксели должны быть внутри тёмной области
-        bright_ratio = bright_pixels / (roi_w * roi_h)
-        if bright_ratio < 0.05 or bright_ratio > 0.5:
+        bright_ratio = bright_pixels / roi_area if roi_area > 0 else 0
+        if bright_ratio < 0.02 or bright_ratio > 0.7:
             continue
         
-        # === 6. Проверяем форму (овальная/закруглённая) ===
-        # Approximate contour
-        epsilon = 0.02 * cv2.arcLength(cnt, True)
-        approx = cv2.approxPolyDP(cnt, epsilon, True)
-        
-        # Овалы обычно имеют 4+ вершины после аппроксимации
-        # Или можно проверить circularity
+        # === 5. Проверка формы (не круглая как аватар) ===
         perimeter = cv2.arcLength(cnt, True)
         if perimeter == 0:
             continue
         
         circularity = 4 * np.pi * (area / (perimeter * perimeter))
         
-        # Панель не идеальный круг, но и не прямоугольник
-        # circularity ~ 0.6-0.8 для овалов
-        if circularity < 0.4 or circularity > 0.85:
+        # Аватарки круглые (>0.85), панели овальные (0.5-0.8)
+        if circularity > 0.85:
             continue
         
-        # === 7. Считаем score ===
-        score = area * bright_ratio * circularity
+        # === 6. Score ===
+        score = area * bright_ratio * (1 + bright_pixels / 100)
         
         candidates.append({
             'cnt': cnt,
             'bbox': (bx, by, bw, bh),
             'score': score,
-            'bright_pixels': bright_pixels
+            'bright_pixels': bright_pixels,
+            'aspect_ratio': aspect_ratio
         })
     
-    if not candidates:
-        return None
+    # === 7. Выбираем лучшего ===
+    if candidates:
+        candidates.sort(key=lambda x: x['score'], reverse=True)
+        best = candidates[0]
+        bx, by, bw, bh = best['bbox']
+        
+        # Debug
+        # timestamp = int(time.time() * 1000)
+        # debug_crop = crop.copy()
+        # cv2.rectangle(debug_crop, (bx, by), (bx + bw, by + bh), (0, 255, 0), 2)
+        # cv2.putText(debug_crop, f"AR:{best['aspect_ratio']:.1f}", 
+        #            (bx, by-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+        # cv2.imwrite(f"./debug/bet_panel_{timestamp}.png", debug_crop)
+        
+        padding = 3
+        return Rect(
+            x1 + max(0, bx - padding),
+            y1 + max(0, by - padding),
+            x1 + min(crop.shape[1], bx + bw + padding),
+            y1 + min(crop.shape[0], by + bh + padding)
+        )
     
-    # === 8. Выбираем лучший кандидат ===
-    # Сортируем по score (площадь * наличие цифр * форма)
-    candidates.sort(key=lambda x: x['score'], reverse=True)
-    best = candidates[0]
-    
-    bx, by, bw, bh = best['bbox']
-    
-    # Добавляем небольшой padding
-    padding = 3
-
-    timestamp = int(time.time() * 1000)
-    debug_crop = crop.copy()
-    cv2.rectangle(debug_crop, (bx, by), (bx + bw, by + bh), (0, 255, 0), 2)
-    cv2.imwrite(f"./debug/bet_panel_{timestamp}.png", debug_crop)
-    # cv2.imwrite(f"./debug/mask_dark_{timestamp}.png", mask_dark)
-    # cv2.imwrite(f"./debug/mask_bright_{timestamp}.png", mask_bright)
-    return Rect(
-        x1 + max(0, bx - padding),
-        y1 + max(0, by - padding),
-        x1 + min(crop.shape[1], bx + bw + padding),
-        y1 + min(crop.shape[0], by + bh + padding)
-    )
+    return None
