@@ -1,6 +1,8 @@
 import argparse
 import time
 import win32gui
+import logging
+from app import state_manager
 from app.capture import capture_window
 from app.state_manager import PokerStateManager
 
@@ -19,6 +21,14 @@ def find_poker_window():
     return candidates[0] if candidates else None
 
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%H:%M:%S'
+    )
+
+    logger = logging.getLogger(__name__)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--room", default="replaypoker")
     parser.add_argument("--seats", type=int, default=6)
@@ -45,28 +55,8 @@ def main():
             frame = capture_window(hwnd)
             state_manager.update_from_frame(frame)
             
-            # Показываем Debug инфу ТОЛЬКО когда очередь героя
-            if state_manager.table.is_hero_turn:
-                hero_turn_icon = "🟢"
-                print(f"\n{hero_turn_icon} Hero turn: {state_manager.table.is_hero_turn}")
-                
-                # Печатаем состояние стола
-                print("Players:")
-                for p in state_manager.table.players:
-                    print(f"  seat {p.seat}: (Hero: {p.is_hero}, Position: {p.position}, "
-                        f"Nickname: {p.nickname}, Active: {p.is_active}, Bet: {p.last_bet})")
-                print(f"Community cards: {state_manager.table.community_cards}")
-                print(f"Hero cards: {next((p.cards for p in state_manager.table.players if p.is_hero), [])}")
-                print("=" * 50)
-            else:
-                print(".", end="", flush=True)
-                time.sleep(0.5)
-                continue
-            
-            time.sleep(1)
-
     except KeyboardInterrupt:
-        print("\nStopped by user")
+        print("\nStopped")
 
 if __name__ == "__main__":
     main()
