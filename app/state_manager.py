@@ -1,10 +1,13 @@
-# app/state_manager.py
+import sys
 import time
 import numpy as np
 import logging
 from rooms.factory import get_room
 from rooms.base_room import BaseRoom
 from services.preflop_analyzer import analyze_preflop
+from services.analyzer.preflop_advisor import PreflopAdvisor
+from ui.overlay_controller import OverlayController, OverlayData
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +16,19 @@ class PokerStateManager:
     Чистый оркестратор: делегирует ВСЮ логику в Room.
     """
     
-    def __init__(self, room_name: str, seats: int, hero_nickname: str, hwnd: int):
+    def __init__(self, room_name: str, seats: int, hero_nickname: str, hwnd: int, enable_overlay: bool = True):
         self.hwnd = hwnd
         self.last_blinds_check = 0.0
         
         # ✅ Room владеет всем: table, geometry, extractors
         self._room: BaseRoom = get_room(room_name, seats, hero_nickname)
+        self.preflop_advisor = PreflopAdvisor()
+
+        self.enable_overlay = enable_overlay
+        self.overlay_controller = OverlayController() if enable_overlay else None
+
+        if enable_overlay:
+            self._init_overlay()
     
     @property
     def table(self):
@@ -26,7 +36,6 @@ class PokerStateManager:
         return self._room.table
     
     def update_from_frame(self, frame: np.ndarray) -> None:
-        """Оркестрация: только координация, без бизнес-логики"""
         current_time = time.time()
         
         # 1) Обновляем блайнды
@@ -38,15 +47,65 @@ class PokerStateManager:
         self._room.process_frame(frame)
         
         # 3) Проверяем очередь героя
-        if self._room.is_hero_turn(frame):
+        is_hero_turn = self._room.is_hero_turn(frame)
+        self.table.is_hero_turn = is_hero_turn
+        
+        if is_hero_turn:
             self._room.on_hero_turn()
             self._log_hero_turn_state()
             
-            # Префлоп-анализ
             if self.table.street == "preflop" and not self.table.community_cards:
-                analyze_preflop(self.table)
+                advice = self.preflop_advisor.get_advice(self.table)
+                if advice:
+                    logger.info(f"💡 Advice: {advice}")
         else:
             self._clear_stale_bets(current_time)
+
+        # 4) Обновляем оверлей
+        if self.enable_overlay and self.overlay_controller:
+            overlay_data = self.overlay_controller.create_overlay_data(self)
+            
+            if self._room.is_hero_turn(frame) and self.table.street == "preflop":
+                advice = self.preflop_advisor.get_advice(self.table)
+                if advice:
+                    overlay_data.advice_action = advice.action.name
+                    overlay_data.advice_confidence = advice.confidence.value
+                    overlay_data.advice_reason = advice.reason
+                    logger.debug(f"  [Overlay] Setting advice: {advice.action.name}")
+            
+            self.overlay_controller.update(overlay_data)
+
+        # 5) Process Qt events + репаинт
+        if self.enable_overlay and hasattr(self, 'qt_app') and self.qt_app:
+            self.qt_app.processEvents()
+            
+            if hasattr(self, 'overlay_window'):
+                self.overlay_window.update()
+
+    def _init_overlay(self):
+        """Инициализирует PyQt6 оверлей"""
+        try:
+            from PyQt6.QtWidgets import QApplication
+            from ui.overlay_window import OverlayWindow
+            
+            # Создаём QApplication (если ещё нет)
+            self.qt_app = QApplication.instance()
+            if not self.qt_app:
+                self.qt_app = QApplication(sys.argv)
+            
+            # Создаём окно оверлея
+            self.overlay_window = OverlayWindow()
+            
+            # Регистрируем callback
+            self.overlay_controller.set_update_callback(self.overlay_window.update_data)
+            
+            # Показываем
+            self.overlay_window.show_overlay()
+            
+            logger.info("✅ Overlay initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to init overlay: {e}")
+            self.enable_overlay = False
     
     def _update_blinds(self) -> None:
         info = self._room.get_table_info(self.hwnd)

@@ -47,7 +47,8 @@ def main():
         room_name=args.room, 
         seats=args.seats, 
         hero_nickname=args.hero,
-        hwnd=hwnd
+        hwnd=hwnd,
+        enable_overlay=True  # Включаем оверлей по умолчанию
     )
 
     try:
@@ -57,6 +58,8 @@ def main():
             
     except KeyboardInterrupt:
         print("\nStopped")
+        if state_manager.enable_overlay:
+            state_manager.overlay_window.hide_overlay()
 
 if __name__ == "__main__":
     main()
