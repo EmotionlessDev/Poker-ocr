@@ -133,34 +133,35 @@ class OverlayWindow(QWidget):
         self.setLayout(layout)
     
     def update_data(self, data):
-        """Обновляет UI с новыми данными"""
+        """Обновляет UI с новыми данными (принимает OverlayData dataclass)"""
         if not data:
             self.reset()
             return
         
-        # Header: Table name + Stage
-        table_name = data.get('table_name', 'Unknown')
-        stage = data.get('stage', 'Unknown')
-        self.title_label.setText(f"Table: {table_name} | {stage}")
+        # Header: Table name + Stage (используем street как stage)
+        stage = getattr(data, 'street', 'Unknown').capitalize()
+        self.title_label.setText(f"Table: Poker | {stage}")
         
         # Hero cards
-        cards = data.get('cards', '--')
+        cards = getattr(data, 'hero_cards', '')
         if cards:
             self.hero_label.setText(f"Cards: {cards}")
         else:
             self.hero_label.setText("Cards: --")
         
         # Table info
-        pos = data.get('hero_pos', '-')
-        pot = data.get('pot_size', 0)
-        villains = data.get('villains_count', 0)
+        pos = getattr(data, 'hero_position', '-')
+        pot = getattr(data, 'pot', 0)
+        villains = getattr(data, 'active_players', 0) - 1  # Исключаем героя
+        if villains < 0:
+            villains = 0
         self.table_label.setText(f"Pos: {pos} | Pot: {pot} | Villains: {villains}")
         
         # Advice с цветовым кодированием
-        advice = data.get('advice', 'WAITING...')
-        action = data.get('action', 'WAIT')
+        advice = getattr(data, 'advice_action', 'WAITING...')
+        action = advice.upper() if advice else 'WAIT'
         
-        self.advice_label.setText(advice)
+        self.advice_label.setText(advice if advice else "WAITING...")
         
         # Сброс стиля
         base_style = """
@@ -207,7 +208,7 @@ class OverlayWindow(QWidget):
             """)
         
         # Если не префлоп - скрываем совет
-        if stage != 'Preflop' and stage != 'Unknown':
+        if stage.lower() != 'preflop' and stage != 'Unknown':
             self.advice_label.setText("POSTFLOP (No Analysis)")
             self.advice_label.setStyleSheet("""
                 QLabel {
@@ -224,7 +225,7 @@ class OverlayWindow(QWidget):
             """)
         
         # Status
-        status = data.get('status', 'OK')
+        status = getattr(data, 'parsing_status', 'OK')
         status_color = {"OK": "#4CAF50", "ERROR": "#F44336", "WAITING": "#FFC107"}.get(status, "#888888")
         self.status_label.setText(f"● {status}")
         self.status_label.setStyleSheet(f"""
