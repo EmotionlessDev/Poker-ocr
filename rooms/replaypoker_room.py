@@ -10,7 +10,7 @@ from detectors.button_detector import DealerButtonDetector
 from services.position_assigner import PositionAssigner
 from detectors.seat_state_detector import SeatStateDetector
 from extractors.nickname_extractor import NicknameExtractor
-from app.nn_client import NeuralNetClient
+from poker_app.nn_client import NeuralNetClient
 from domain.geometry import Rect, Point
 
 
