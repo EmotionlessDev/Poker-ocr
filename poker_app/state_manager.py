@@ -50,32 +50,52 @@ class PokerStateManager:
         is_hero_turn = self._room.is_hero_turn(frame)
         self.table.is_hero_turn = is_hero_turn
         
-        if is_hero_turn:
+        # 4) Проверяем стадию игры (префлоп или постфлоп)
+        has_community_cards = len(self.table.community_cards) > 0
+        is_preflop = not has_community_cards
+        
+        # Обновляем street на основе карт стола
+        if is_preflop:
+            self.table.street = "preflop"
+        elif len(self.table.community_cards) == 3:
+            self.table.street = "flop"
+        elif len(self.table.community_cards) == 4:
+            self.table.street = "turn"
+        elif len(self.table.community_cards) >= 5:
+            self.table.street = "river"
+        
+        if is_hero_turn and is_preflop:
             self._room.on_hero_turn()
             self._log_hero_turn_state()
             
-            if self.table.street == "preflop" and not self.table.community_cards:
-                advice = self.preflop_advisor.get_advice(self.table)
-                if advice:
-                    logger.info(f"💡 Advice: {advice}")
+            # Анализируем префлоп ситуацию
+            advice = self.preflop_advisor.get_advice(self.table)
+            if advice:
+                logger.info(f"💡 Advice: {advice}")
         else:
             self._clear_stale_bets(current_time)
 
-        # 4) Обновляем оверлей
+        # 5) Обновляем оверлей
         if self.enable_overlay and self.overlay_controller:
             overlay_data = self.overlay_controller.create_overlay_data(self)
             
-            if self._room.is_hero_turn(frame) and self.table.street == "preflop":
+            # Показываем советы ТОЛЬКО на префлопе
+            if is_hero_turn and is_preflop:
                 advice = self.preflop_advisor.get_advice(self.table)
                 if advice:
                     overlay_data.advice_action = advice.action.name
                     overlay_data.advice_confidence = advice.confidence.value
                     overlay_data.advice_reason = advice.reason
                     logger.debug(f"  [Overlay] Setting advice: {advice.action.name}")
+            else:
+                # На постфлопе скрываем советы
+                overlay_data.advice_action = None
+                overlay_data.advice_confidence = None
+                overlay_data.advice_reason = None
             
             self.overlay_controller.update(overlay_data)
 
-        # 5) Process Qt events + репаинт
+        # 6) Process Qt events + репаинт
         if self.enable_overlay and hasattr(self, 'qt_app') and self.qt_app:
             self.qt_app.processEvents()
             
