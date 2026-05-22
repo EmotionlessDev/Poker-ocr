@@ -8,8 +8,8 @@ import argparse
 
 from PyQt6 import QtWidgets, QtGui, QtCore
 
-from app.pipeline import PokerVisionPipeline
-from app.nn_client import NeuralNetClient
+from poker_app.pipeline import PokerVisionPipeline
+from poker_app.nn_client import NeuralNetClient
 
 
 # -----------------------------

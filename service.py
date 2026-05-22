@@ -3,8 +3,8 @@ import time
 import win32gui
 import logging
 from app import state_manager
-from app.capture import capture_window
-from app.state_manager import PokerStateManager
+from poker_app.capture import capture_window
+from poker_app.state_manager import PokerStateManager
 
 def find_poker_window():
     keywords = ["replaypoker", "holdem", "omaha"]
