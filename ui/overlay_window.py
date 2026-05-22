@@ -3,15 +3,14 @@ from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
-from .overlay_controller import OverlayData
-
 
 class OverlayWindow(QWidget):
     """
-    Прозрачное окно оверлея.
+    Минималистичное прозрачное окно оверлея.
     - Always on top
     - Click-through (можно кликать сквозь окно)
     - Обновляется в real-time
+    - Современный дизайн с цветовым кодированием
     """
     
     def __init__(self):
@@ -30,80 +29,212 @@ class OverlayWindow(QWidget):
         # Click-through (можно кликать сквозь окно)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         
-        # Позиция и размер
-        self.setGeometry(100, 100, 400, 300)
+        # Позиция и размер (компактный)
+        self.setGeometry(100, 100, 340, 220)
         
         # UI элементы
         self._init_ui()
         
-        # Таймер для авто-обновления (опционально)
+        # Таймер для авто-обновления позиции (опционально)
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self._refresh)
-        self.update_timer.start(500)  # Обновление каждые 500ms
+        self.update_timer.start(500)
     
     def _init_ui(self):
         """Инициализация UI элементов"""
         layout = QVBoxLayout()
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
         
-        # Заголовок
-        self.title_label = QLabel(" PokerOCR Overlay")
-        self.title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        self.title_label.setStyleSheet("color: #00ff00; background: rgba(0,0,0,0.7); padding: 5px;")
+        # Основной стиль контейнера
+        self.setStyleSheet("""
+            QWidget {
+                background-color: rgba(20, 20, 20, 0.85);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+            }
+            QLabel {
+                padding: 2px;
+            }
+        """)
+        
+        # Header: Table info and Stage
+        self.title_label = QLabel("Table: Unknown | Preflop")
+        self.title_label.setObjectName("headerLabel")
+        self.title_label.setStyleSheet("""
+            QLabel {
+                font-size: 11px;
+                font-weight: 600;
+                color: #AAAAAA;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                padding-bottom: 6px;
+                margin-bottom: 4px;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }
+        """)
         layout.addWidget(self.title_label)
         
-        # Hero info
-        self.hero_label = QLabel("Hero: --")
-        self.hero_label.setFont(QFont("Arial", 11))
-        self.hero_label.setStyleSheet("color: #ffffff; background: rgba(0,0,0,0.7); padding: 3px;")
+        # Hero cards (крупно, моноширинный шрифт)
+        self.hero_label = QLabel("Cards: --")
+        self.hero_label.setObjectName("heroLabel")
+        self.hero_label.setStyleSheet("""
+            QLabel {
+                font-size: 16px;
+                font-weight: 700;
+                color: #FFFFFF;
+                font-family: 'Consolas', 'Monaco', monospace;
+                letter-spacing: 1px;
+            }
+        """)
         layout.addWidget(self.hero_label)
         
-        # Table info
-        self.table_label = QLabel("Table: --")
-        self.table_label.setFont(QFont("Arial", 10))
-        self.table_label.setStyleSheet("color: #aaaaaa; background: rgba(0,0,0,0.7); padding: 3px;")
+        # Table info (позиция, пот, оппоненты)
+        self.table_label = QLabel("Pos: - | Pot: 0 | Villains: 0")
+        self.table_label.setObjectName("infoLabel")
+        self.table_label.setStyleSheet("""
+            QLabel {
+                font-size: 11px;
+                color: #CCCCCC;
+                font-family: 'Consolas', 'Monaco', monospace;
+            }
+        """)
         layout.addWidget(self.table_label)
         
-        # Advice (самое важное)
-        self.advice_label = QLabel("💡 Advice: --")
-        self.advice_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.advice_label.setStyleSheet(
-            "color: #00ff00; background: rgba(0,100,0,0.8); padding: 8px; border-radius: 5px;"
-        )
+        # Advice (самое важное - с цветовым кодированием)
+        self.advice_label = QLabel("WAITING FOR HAND...")
+        self.advice_label.setObjectName("adviceLabel")
+        self.advice_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.advice_label.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: 800;
+                padding: 10px;
+                border-radius: 6px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #AAAAAA;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }
+        """)
         layout.addWidget(self.advice_label)
         
-        # Status
-        self.status_label = QLabel("Status: --")
-        self.status_label.setFont(QFont("Arial", 9))
-        self.status_label.setStyleSheet("color: #888888; background: rgba(0,0,0,0.7); padding: 3px;")
+        # Status (маленький индикатор внизу)
+        self.status_label = QLabel("● System Ready")
+        self.status_label.setObjectName("statusLabel")
+        self.status_label.setStyleSheet("""
+            QLabel {
+                font-size: 10px;
+                color: #4CAF50;
+                font-style: italic;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }
+        """)
         layout.addWidget(self.status_label)
         
         self.setLayout(layout)
     
-    def update_data(self, data: OverlayData):
+    def update_data(self, data):
         """Обновляет UI с новыми данными"""
-        # Hero info
-        hero_text = f"🦸 Hero: {data.hero_cards} ({data.hero_position})"
-        if data.is_hero_turn:
-            hero_text += " ⏰ YOUR TURN!"
-        self.hero_label.setText(hero_text)
+        if not data:
+            self.reset()
+            return
+        
+        # Header: Table name + Stage
+        table_name = data.get('table_name', 'Unknown')
+        stage = data.get('stage', 'Unknown')
+        self.title_label.setText(f"Table: {table_name} | {stage}")
+        
+        # Hero cards
+        cards = data.get('cards', '--')
+        if cards:
+            self.hero_label.setText(f"Cards: {cards}")
+        else:
+            self.hero_label.setText("Cards: --")
         
         # Table info
-        self.table_label.setText(
-            f"🪙 {data.blinds} | 👥 {data.active_players} players | "
-            f"📊 {data.raises_count} raises | 🎯 {data.street}"
-        )
+        pos = data.get('hero_pos', '-')
+        pot = data.get('pot_size', 0)
+        villains = data.get('villains_count', 0)
+        self.table_label.setText(f"Pos: {pos} | Pot: {pot} | Villains: {villains}")
         
-        # Advice
-        if data.advice_action:
-            emoji = {"RAISE": "🟢", "FOLD": "❌", "CALL": "🟡"}.get(data.advice_action, "❓")
-            conf_icon = {"HIGH": "✅", "MEDIUM": "✓", "LOW": "⚠️"}.get(data.advice_confidence, "?")
-            self.advice_label.setText(f"💡 {emoji} {data.advice_action} {conf_icon} — {data.advice_reason}")
+        # Advice с цветовым кодированием
+        advice = data.get('advice', 'WAITING...')
+        action = data.get('action', 'WAIT')
+        
+        self.advice_label.setText(advice)
+        
+        # Сброс стиля
+        base_style = """
+            QLabel {{
+                font-size: 18px;
+                font-weight: 800;
+                padding: 10px;
+                border-radius: 6px;
+                text-align: center;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }}
+        """
+        
+        # Цветовое кодирование действий
+        if action in ['RAISE', '3BET', '4BET']:
+            color = "#4CAF50"  # Зеленый - действие/агрессия
+            bg = "rgba(76, 175, 80, 0.15)"
+            self.advice_label.setStyleSheet(base_style.format("") + f"""
+                background-color: {bg};
+                color: {color};
+                border: 1px solid {color};
+            """)
+        elif action in ['CALL', 'CHECK']:
+            color = "#FFC107"  # Желтый - нейтральное действие
+            bg = "rgba(255, 193, 7, 0.15)"
+            self.advice_label.setStyleSheet(base_style.format("") + f"""
+                background-color: {bg};
+                color: {color};
+                border: 1px solid {color};
+            """)
+        elif action == 'FOLD':
+            color = "#F44336"  # Красный - отказ
+            bg = "rgba(244, 67, 54, 0.15)"
+            self.advice_label.setStyleSheet(base_style.format("") + f"""
+                background-color: {bg};
+                color: {color};
+                border: 1px solid {color};
+            """)
         else:
-            self.advice_label.setText("💡 Advice: --")
+            # По умолчанию / ожидание
+            self.advice_label.setStyleSheet(base_style.format("") + """
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #AAAAAA;
+            """)
+        
+        # Если не префлоп - скрываем совет
+        if stage != 'Preflop' and stage != 'Unknown':
+            self.advice_label.setText("POSTFLOP (No Analysis)")
+            self.advice_label.setStyleSheet("""
+                QLabel {
+                    font-size: 14px;
+                    font-weight: 600;
+                    padding: 10px;
+                    border-radius: 6px;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #666666;
+                    text-align: center;
+                    font-family: 'Segoe UI', 'Roboto', sans-serif;
+                    border: 1px dashed #444444;
+                }
+            """)
         
         # Status
-        status_emoji = {"OK": "✅", "ERROR": "❌", "WAITING": "⏳"}.get(data.parsing_status, "?")
-        self.status_label.setText(f"{status_emoji} Status: {data.parsing_status}")
+        status = data.get('status', 'OK')
+        status_color = {"OK": "#4CAF50", "ERROR": "#F44336", "WAITING": "#FFC107"}.get(status, "#888888")
+        self.status_label.setText(f"● {status}")
+        self.status_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: 10px;
+                color: {status_color};
+                font-style: italic;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }}
+        """)
     
     def _refresh(self):
         """Авто-обновление (если нужно)"""
@@ -116,3 +247,31 @@ class OverlayWindow(QWidget):
     def hide_overlay(self):
         """Скрывает оверлей"""
         self.hide()
+    
+    def reset(self):
+        """Сброс к состоянию по умолчанию"""
+        self.title_label.setText("Table: Unknown | Waiting")
+        self.hero_label.setText("Cards: --")
+        self.table_label.setText("Pos: - | Pot: 0 | Villains: 0")
+        self.advice_label.setText("WAITING FOR HAND...")
+        self.advice_label.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: 800;
+                padding: 10px;
+                border-radius: 6px;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #AAAAAA;
+                text-align: center;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }
+        """)
+        self.status_label.setText("● Ready")
+        self.status_label.setStyleSheet("""
+            QLabel {
+                font-size: 10px;
+                color: #4CAF50;
+                font-style: italic;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }
+        """)
