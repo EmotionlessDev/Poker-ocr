@@ -114,12 +114,71 @@ class PreflopAdvisor:
             )
     
     def _advise_vs_open(self, table: PokerTable, hero: Player) -> Advice:
-        """Заглушка для ответа на открывашку"""
-        return Advice(
-            action=ActionRecommendation.FOLD,
-            confidence=Confidence.LOW,
-            reason="VS_OPEN logic not implemented yet"
-        )
+        """
+        Рекомендация против открывашки (VS_OPEN).
+        Стратегия: 3-бет или фолд, колл почти не используем.
+        """
+        hand_str = cards_to_sorted_string(hero.cards)
+        hero_position = hero.position
+        
+        # === 1. Определяем кто открылся ===
+        opener = self._find_opener(table)
+        if not opener or not opener.position:
+            # Не смогли определить опенера — фолд по умолчанию
+            return Advice(
+                action=ActionRecommendation.FOLD,
+                confidence=Confidence.LOW,
+                reason="Could not identify opener"
+            )
+        
+        opener_position = opener.position
+        
+        # === 2. Находим ключ ренджа ===
+        range_key = self._get_3bet_range_key(hero_position, opener_position)
+        if not range_key:
+            # Нет ренджа для этой комбинации позиций — фолд
+            return Advice(
+                action=ActionRecommendation.FOLD,
+                confidence=Confidence.MEDIUM,
+                reason=f"No 3-bet range for {hero_position} vs {opener_position}"
+            )
+        
+        # === 3. Получаем и парсим рендж ===
+        range_str = ranges.RANGES_3BET.get(range_key, "")
+        if not range_str:
+            return Advice(
+                action=ActionRecommendation.FOLD,
+                confidence=Confidence.LOW,
+                reason=f"Empty range for key {range_key}"
+            )
+        
+        # Парсим с кэшированием
+        if range_key not in self._parsed_ranges:
+            self._parsed_ranges[range_key] = self.range_parser.parse(range_str)
+        
+        # === 4. Проверяем руку ===
+        in_range = hand_matches_range(hand_str, self._parsed_ranges[range_key])
+        
+        if in_range:
+            # Учитываем размер рейза опенера для размера 3-бета
+            opener_bet_bb = opener.last_bet / (table.big_blind or 200)
+            sizing = "3x" if opener_bet_bb <= 2.5 else "4x"
+            
+            return Advice(
+                action=ActionRecommendation.RAISE,
+                confidence=Confidence.HIGH,
+                reason=f"{hand_str} is in 3-bet range vs {opener_position} ({sizing})",
+                hand_strength=0.85,
+                range_coverage=1.0
+            )
+        else:
+            return Advice(
+                action=ActionRecommendation.FOLD,
+                confidence=Confidence.MEDIUM,
+                reason=f"{hand_str} not in 3-bet range vs {opener_position}",
+                hand_strength=0.35,
+                range_coverage=0.0
+            )
     
     def _advise_vs_3bet(self, table: PokerTable, hero: Player) -> Advice:
         """Заглушка для 3-бет спотов"""
@@ -128,3 +187,75 @@ class PreflopAdvisor:
             confidence=Confidence.LOW,
             reason="3BET_POT logic not implemented yet"
         )
+    
+    def _find_opener(self, table: PokerTable) -> Optional[Player]:
+        """
+        Находит игрока, который открылся первым (сделал рейз > 2.0 BB).
+        """
+        bb = table.big_blind if table.big_blind > 0 else 200.0
+        raise_threshold = bb * 2.0
+        
+        # Ищем первого игрока с рейзом (не блайнды)
+        for p in table.players:
+            if p.is_active and p.last_bet >= raise_threshold:
+                # Исключаем блайнды если они просто доложили
+                if p.position not in ["SB", "BB"] or p.last_bet > bb * 1.5:
+                    return p
+        return None
+
+    def _get_3bet_range_key(self, hero_pos: str, opener_pos: str) -> Optional[str]:
+        """
+        Возвращает ключ ренджа для комбинации позиций.
+        """
+        # Прямой маппинг
+        key = ranges.RANGES_3BET_KEYS.get((hero_pos, opener_pos))
+        if key:
+            return key
+        
+        # Fallback: группируем позиции опенера в категории
+        opener_category = self._categorize_position(opener_pos)
+        
+        # Герой в блайндах — используем общие ренджи
+        if hero_pos == "BB":
+            if opener_category == "EP":
+                return "3BET_BB_VS_EP"
+            elif opener_category == "MP":
+                return "3BET_BB_VS_MP"
+            elif opener_category == "CO":
+                return "3BET_BB_VS_CO"
+            elif opener_category == "BTN":
+                return "3BET_BB_VS_BU"
+        elif hero_pos == "SB":
+            if opener_category in ["EP", "MP"]:
+                return "3BET_SB_VS_MP"  # используем общий
+            elif opener_category == "CO":
+                return "3BET_SB_VS_CO"
+            elif opener_category == "BTN":
+                return "3BET_SB_VS_BTN"
+        
+        # Герой не в блайндах — упрощённая логика
+        if hero_pos in ["UTG", "MP", "CO", "BTN"]:
+            if opener_category in ["EP", "MP"]:
+                return "3BET_VS_MP"
+            elif opener_category == "CO" and hero_pos == "BTN":
+                return "3BET_BTN_VS_CO"
+        
+        return None
+
+    def _categorize_position(self, pos: str) -> str:
+        """
+        Группирует позицию в категорию: EP, MP, CO, BTN, SB, BB.
+        """
+        if pos in ["UTG", "UTG+1"]:
+            return "EP"
+        elif pos == "MP":
+            return "MP"
+        elif pos == "CO":
+            return "CO"
+        elif pos == "BTN":
+            return "BTN"
+        elif pos == "SB":
+            return "SB"
+        elif pos == "BB":
+            return "BB"
+        return "UNKNOWN"
