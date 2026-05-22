@@ -36,6 +36,30 @@ RANGES_3BET = {
     "3BET_BB_VS_SB": "AA-TT,AKs-ATs,A5s-A2s,KQs-KTs,K5s-K2s,QJs-QTs,Q5s-Q2s,JTs,AKo-AQo,A5o-A2o,J6s-J2s,T6s-T2s,A7o-A6o,K8o-K6o",
 }
 
+# 4-бет ренджи для разных ситуаций
+RANGES_4BET = {
+    # Общие ренджи vs EP (UTG, UTG+1, MP)
+    "4BET_VS_EP": "AA-JJ,AKs-AQs,AKo",
+    
+    # Vs CO
+    "4BET_VS_CO": "AA-TT,AKs-AQs,AKo-AQo",
+    
+    # Vs BTN
+    "4BET_VS_BTN": "AA-99,AKs-AQs,AKo-AQo",
+    
+    # Герой в BB vs EP
+    "4BET_BB_VS_EP": "AA-JJ,AKs-AQs,AKo",
+    
+    # Герой в BB vs CO
+    "4BET_BB_VS_CO": "AA-TT,AKs-AQs,AKo-AQo",
+    
+    # Герой в BB vs BTN
+    "4BET_BB_VS_BTN": "AA-99,AKs-AQs,AKo-AQo",
+    
+    # Герой на BTN vs CO
+    "4BET_BTN_VS_CO": "AA-TT,AKs-AQs,AKo-AQo",
+}
+
 # Маппинг: (позиция героя, позиция опенера) → ключ ренджа
 RANGES_3BET_KEYS = {
     # Герой не в блайндах (упрощённо)

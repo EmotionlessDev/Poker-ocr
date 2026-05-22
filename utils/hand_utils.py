@@ -27,6 +27,10 @@ def cards_to_sorted_string(cards: List[Card]) -> str:
         r1, r2 = r2, r1
         c1, c2 = c2, c1
     
+    # Для пар (одинаковых рангов) всегда возвращаем без суффикса s/o
+    if r1 == r2:
+        return f"{r1}{r2}"
+    
     suited = "s" if c1.suit == c2.suit else "o"
     return f"{r1}{r2}{suited}"
 
@@ -86,25 +90,46 @@ def hand_matches_range(hand_str: str, range_tokens: List[str]) -> bool:
     rank1, rank2 = hand_str[0], hand_str[1]
     suited = hand_str[2] if len(hand_str) > 2 else None
     
+    RANK_ORDER = "23456789TJQKA"
+    
     for token in range_tokens:
         token = token.strip()
         if not token:
             continue
         
-        # Пары
-        if token[0].isdigit() and "-" in token:
-            # "55-22"
-            start, end = token.split("-")
-            if rank1 == rank2:  # pocket pair
-                if RANK_ORDER.index(end[0]) <= RANK_ORDER.index(rank1) <= RANK_ORDER.index(start[0]):
-                    return True
+        # Пары: "AA-55" или "55-22"
+        if "-" in token and len(token) == 5:
+            # Проверяем что это диапазон пар (оба символа одинаковые)
+            start_part = token.split("-")[0]
+            end_part = token.split("-")[1]
+            
+            if len(start_part) == 2 and len(end_part) == 2 and start_part[0] == start_part[1] and end_part[0] == end_part[1]:
+                # Диапазон пар типа "AA-55" или "55-22"
+                if rank1 == rank2:  # pocket pair
+                    start_rank = start_part[0]
+                    end_rank = end_part[0]
+                    low_idx = min(RANK_ORDER.index(start_rank), RANK_ORDER.index(end_rank))
+                    high_idx = max(RANK_ORDER.index(start_rank), RANK_ORDER.index(end_rank))
+                    curr_idx = RANK_ORDER.index(rank1)
+                    if low_idx <= curr_idx <= high_idx:
+                        return True
         
         # Suited range: "AKs-A2s"
-        elif "-" in token and token.endswith("s"):
+        elif "-" in token and token.endswith("s") and len(token) == 7:
             if suited == "s" and rank1 == "A":
                 high = token[1]
                 low = token.split("-")[1][1]
                 if RANK_ORDER.index(low) <= RANK_ORDER.index(rank2) <= RANK_ORDER.index(high):
+                    return True
+        
+        # Offsuit range: "KQo-K9o"
+        elif "-" in token and token.endswith("o") and len(token) == 7:
+            parts = token.split("-")
+            r1 = parts[0][0]
+            r2_high = parts[0][1]
+            r2_low = parts[1][1]
+            if suited == "o" and rank1 == r1:
+                if RANK_ORDER.index(r2_low) <= RANK_ORDER.index(rank2) <= RANK_ORDER.index(r2_high):
                     return True
         
         # Конкретная рука
