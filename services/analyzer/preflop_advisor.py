@@ -22,13 +22,13 @@ class PreflopAdvisor:
     
     def get_advice(self, table: PokerTable) -> Optional[Advice]:
         """
-        Главная точка входа: анализирует состояние стола и возвращает рекомендацию.
+        Main entry point: analyzes table state and returns recommendation.
         """
         hero = next((p for p in table.players if p.is_hero), None)
         if not hero or not hero.cards or not hero.position:
             return None
         
-        # Определяем тип ситуации
+        # Determine situation type
         situation = self._classify_situation(table, hero)
         
         if situation == "RFI":
@@ -38,23 +38,23 @@ class PreflopAdvisor:
         elif situation == "3BET_POT":
             return self._advise_vs_3bet(table, hero)
         else:
-            # Пока не поддерживаем
+            # Not supported yet
             return None
     
     def _classify_situation(self, table: PokerTable, hero: Player) -> str:
         """
-        Определяет тип префлоп-ситуации на основе количества рейзов.
+        Determines preflop situation type based on number of raises.
         
-        RFI: 0 рейзов (никто не повышал, только блайнды или коллы)
-        VS_OPEN: 1 рейз (кто-то открылся, другие фолд/колл)
-        3BET_POT: 2+ рейза (рейз + рейз рейза)
+        RFI: 0 raises (no one raised, only blinds or calls)
+        VS_OPEN: 1 raise (someone opened, others fold/call)
+        3BET_POT: 2+ raises (raise + reraise)
         """
         
-        # Fallback если блайнды ещё не спаршены
+        # Fallback if blinds not yet parsed
         bb = table.big_blind if table.big_blind > 0 else 200.0
         
-        # === 1. Считаем количество рейзов ===
-        # Рейз = ставка >= 2.0 BB (исключаем блайнды и коллы)
+        # === 1. Count raises ===
+        # Raise = bet >= 2.0 BB (excluding blinds and calls)
         raise_threshold = bb * 2.0
         
         raises_count = 0
@@ -62,31 +62,58 @@ class PreflopAdvisor:
             if not p.is_active or p.last_bet <= 0:
                 continue
             bet_bb = p.last_bet / bb
-            # Исключаем блайнды если они просто доложили (SB < 1.5BB, BB = 1.0BB)
+            # Exclude blinds if they just completed (SB < 1.5BB, BB = 1.0BB)
             if p.position in ["SB", "BB"] and bet_bb < 1.5:
                 continue
             if bet_bb >= raise_threshold:
                 raises_count += 1
         
-        # === 2. Классифицируем ===
+        # === 2. Classify ===
         if raises_count == 0:
-            # Никто не рейзил → RFI
+            # No one raised → RFI
             return "RFI"
         
         elif raises_count == 1:
-            # Один рейзер → VS_OPEN
+            # One raiser → VS_OPEN
             return "VS_OPEN"
         
         else:
-            # Два и более рейза → 3BET_POT
+            # Two or more raises → 3BET_POT
             return "3BET_POT"
     
     def _advise_rfi(self, table: PokerTable, hero: Player) -> Advice:
-        """Рекомендация для RFI спота"""
+        """Recommendation for RFI spot"""
         hand_str = cards_to_sorted_string(hero.cards)
         position = self._normalize_position(hero.position)
         
-        # Получаем рендж для позиции
+        # Check if hero is on BB and everyone else has just called (limped)
+        # In this case, hero has option to check
+        if position == "BB":
+            # Check if there are no raises (only blinds and calls)
+            bb = table.big_blind if table.big_blind > 0 else 200.0
+            has_raiser = False
+            for p in table.players:
+                if not p.is_active or p.last_bet <= 0:
+                    continue
+                bet_bb = p.last_bet / bb
+                # Exclude blinds if they just completed (SB < 1.5BB, BB = 1.0BB)
+                if p.position in ["SB", "BB"] and bet_bb < 1.5:
+                    continue
+                if bet_bb >= 2.0:  # This is a raise
+                    has_raiser = True
+                    break
+            
+            # If no raiser, BB can check
+            if not has_raiser:
+                return Advice(
+                    action=ActionRecommendation.CHECK,
+                    confidence=Confidence.HIGH,
+                    reason=f"Everyone limped, you can check from BB with {hand_str}",
+                    hand_strength=0.5,
+                    range_coverage=1.0
+                )
+        
+        # Get range for position
         range_str = ranges.RFI_RANGES.get(position, "")
         if not range_str:
             return Advice(
@@ -95,7 +122,7 @@ class PreflopAdvisor:
                 reason=f"No range defined for position {position}"
             )
         
-        # Парсим рендж (с кэшированием)
+        # Parse range (with caching)
         if position not in self._parsed_ranges:
             self._parsed_ranges[position] = self.range_parser.parse(range_str)
         
@@ -106,7 +133,7 @@ class PreflopAdvisor:
                 action=ActionRecommendation.RAISE,
                 confidence=Confidence.HIGH,
                 reason=f"{hand_str} is in RFI range for {position}",
-                hand_strength=0.8,  # заглушка
+                hand_strength=0.8,  # placeholder
                 range_coverage=1.0
             )
         else:
@@ -120,16 +147,16 @@ class PreflopAdvisor:
     
     def _advise_vs_open(self, table: PokerTable, hero: Player) -> Advice:
         """
-        Рекомендация против открывашки (VS_OPEN).
-        Стратегия: 3-бет или фолд, колл почти не используем.
+        Recommendation against opener (VS_OPEN).
+        Strategy: 3-bet or fold, call almost never used.
         """
         hand_str = cards_to_sorted_string(hero.cards)
         hero_position = self._normalize_position(hero.position)
         
-        # === 1. Определяем кто открылся ===
+        # === 1. Identify who opened ===
         opener = self._find_opener(table)
         if not opener or not opener.position:
-            # Не смогли определить опенера — фолд по умолчанию
+            # Could not identify opener — default to fold
             return Advice(
                 action=ActionRecommendation.FOLD,
                 confidence=Confidence.LOW,
@@ -138,17 +165,17 @@ class PreflopAdvisor:
         
         opener_position = self._normalize_position(opener.position)
         
-        # === 2. Находим ключ ренджа ===
+        # === 2. Find range key ===
         range_key = self._get_3bet_range_key(hero_position, opener_position)
         if not range_key:
-            # Нет ренджа для этой комбинации позиций — фолд
+            # No range for this position combination — fold
             return Advice(
                 action=ActionRecommendation.FOLD,
                 confidence=Confidence.MEDIUM,
                 reason=f"No 3-bet range for {hero_position} vs {opener_position}"
             )
         
-        # === 3. Получаем и парсим рендж ===
+        # === 3. Get and parse range ===
         range_str = ranges.RANGES_3BET.get(range_key, "")
         if not range_str:
             return Advice(
@@ -157,15 +184,15 @@ class PreflopAdvisor:
                 reason=f"Empty range for key {range_key}"
             )
         
-        # Парсим с кэшированием
+        # Parse with caching
         if range_key not in self._parsed_ranges:
             self._parsed_ranges[range_key] = self.range_parser.parse(range_str)
         
-        # === 4. Проверяем руку ===
+        # === 4. Check hand ===
         in_range = hand_matches_range(hand_str, self._parsed_ranges[range_key])
         
         if in_range:
-            # Учитываем размер рейза опенера для размера 3-бета
+            # Consider opener's bet size for 3-bet sizing
             opener_bet_bb = opener.last_bet / (table.big_blind or 200)
             sizing = "3x" if opener_bet_bb <= 2.5 else "4x"
             
@@ -187,13 +214,13 @@ class PreflopAdvisor:
     
     def _advise_vs_3bet(self, table: PokerTable, hero: Player) -> Advice:
         """
-        Рекомендация для 3-бет спотов (4-бет или фолд).
-        Стратегия: 4-бет с сильными руками, фолд со слабыми.
+        Recommendation for 3-bet spots (4-bet or fold).
+        Strategy: 4-bet with strong hands, fold with weak ones.
         """
         hand_str = cards_to_sorted_string(hero.cards)
         hero_position = self._normalize_position(hero.position)
         
-        # === 1. Определяем кто сделал 3-бет ===
+        # === 1. Identify who made the 3-bet ===
         threebettor = self._find_threebettor(table)
         if not threebettor or not threebettor.position:
             return Advice(
@@ -204,7 +231,7 @@ class PreflopAdvisor:
         
         threebettor_position = self._normalize_position(threebettor.position)
         
-        # === 2. Находим ключ ренджа для 4-бета ===
+        # === 2. Find 4-bet range key ===
         range_key = self._get_4bet_range_key(hero_position, threebettor_position)
         if not range_key:
             return Advice(
@@ -213,7 +240,7 @@ class PreflopAdvisor:
                 reason=f"No 4-bet range for {hero_position} vs 3bet from {threebettor_position}"
             )
         
-        # === 3. Получаем и парсим рендж ===
+        # === 3. Get and parse range ===
         range_str = ranges.RANGES_4BET.get(range_key, "")
         if not range_str:
             return Advice(
@@ -222,11 +249,11 @@ class PreflopAdvisor:
                 reason=f"Empty 4-bet range for key {range_key}"
             )
         
-        # Парсим с кэшированием
+        # Parse with caching
         if range_key not in self._parsed_ranges:
             self._parsed_ranges[range_key] = self.range_parser.parse(range_str)
         
-        # === 4. Проверяем руку ===
+        # === 4. Check hand ===
         in_range = hand_matches_range(hand_str, self._parsed_ranges[range_key])
         
         if in_range:
@@ -250,9 +277,9 @@ class PreflopAdvisor:
             )
     
     def _find_threebettor(self, table: PokerTable) -> Optional[Player]:
-        """Находит игрока сделавшего 3-бет (второй рейз)"""
+        """Finds player who made 3-bet (second raise)"""
         bb = table.big_blind if table.big_blind > 0 else 200.0
-        raise_threshold = bb * 3.5  # 3-бет обычно >= 3.5BB
+        raise_threshold = bb * 3.5  # 3-bet usually >= 3.5BB
         
         for p in table.players:
             if p.is_active and p.last_bet >= raise_threshold:
@@ -261,8 +288,8 @@ class PreflopAdvisor:
         return None
     
     def _get_4bet_range_key(self, hero_pos: str, threebettor_pos: str) -> Optional[str]:
-        """Возвращает ключ ренджа для 4-бета"""
-        # Упрощённая логика
+        """Returns 4-bet range key"""
+        # Simplified logic
         if hero_pos in ["SB", "BB"]:
             if threebettor_pos in ["UTG", "UTG+1", "MP"]:
                 return "4BET_BB_VS_EP"

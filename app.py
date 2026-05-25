@@ -11,53 +11,53 @@ from PyQt6.QtGui import QFont
 
 
 class WindowSelectorDialog(QDialog):
-    """Диалог выбора окна для захвата"""
+    """Window selection dialog for capture"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Выберите окно покера")
+        self.setWindowTitle("Select Poker Window")
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
         self.selected_hwnd = None
         
         layout = QVBoxLayout(self)
         
-        # Инструкция
-        info_label = QLabel("Выберите окно покерного стола из списка:")
+        # Instruction
+        info_label = QLabel("Select a poker table window from the list:")
         info_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(info_label)
         
-        # Список окон
+        # Window list
         self.window_list = QListWidget()
         self.window_list.setAlternatingRowColors(True)
         layout.addWidget(self.window_list)
         
-        # Кнопки
+        # Buttons
         button_layout = QHBoxLayout()
         
-        refresh_btn = QPushButton("🔄 Обновить список")
+        refresh_btn = QPushButton("🔄 Refresh List")
         refresh_btn.clicked.connect(self.refresh_windows)
         button_layout.addWidget(refresh_btn)
         
-        select_btn = QPushButton("✅ Выбрать")
+        select_btn = QPushButton("✅ Select")
         select_btn.setDefault(True)
         select_btn.clicked.connect(self.select_window)
         button_layout.addWidget(select_btn)
         
-        cancel_btn = QPushButton("❌ Отмена")
+        cancel_btn = QPushButton("❌ Cancel")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
         
         layout.addLayout(button_layout)
         
-        # Заполняем список при открытии
+        # Populate list on open
         self.refresh_windows()
         
-        # Двойной клик для выбора
+        # Double-click to select
         self.window_list.itemDoubleClicked.connect(self.select_window)
     
     def refresh_windows(self):
-        """Обновить список доступных окон"""
+        """Refresh list of available windows"""
         self.window_list.clear()
         windows = self.enumerate_visible_windows()
         
@@ -70,14 +70,14 @@ class WindowSelectorDialog(QDialog):
             self.window_list.setCurrentRow(0)
     
     def enumerate_visible_windows(self):
-        """Получить список видимых окон"""
+        """Get list of visible windows"""
         windows = []
         
         def enum_callback(hwnd, _):
             if not win32gui.IsWindowVisible(hwnd):
                 return
             
-            # Получаем только окна верхнего уровня
+            # Get only top-level windows
             if win32gui.GetParent(hwnd) != 0:
                 return
             
@@ -89,21 +89,21 @@ class WindowSelectorDialog(QDialog):
         return windows
     
     def select_window(self):
-        """Выбрать текущее окно"""
+        """Select current window"""
         current_item = self.window_list.currentItem()
         if current_item:
             self.selected_hwnd = current_item.data(Qt.ItemDataRole.UserRole)
             self.accept()
         else:
-            QMessageBox.warning(self, "Предупреждение", "Выберите окно из списка!")
+            QMessageBox.warning(self, "Warning", "Select a window from the list!")
 
 
 class SettingsDialog(QDialog):
-    """Диалог настроек приложения"""
+    """Application settings dialog"""
     
     def __init__(self, parent=None, room="replaypoker", seats=6, hero="Elots"):
         super().__init__(parent)
-        self.setWindowTitle("Настройки")
+        self.setWindowTitle("Settings")
         self.setMinimumWidth(300)
         
         self.room = room
@@ -112,35 +112,35 @@ class SettingsDialog(QDialog):
         
         layout = QFormLayout(self)
         
-        # Комната
+        # Room
         self.room_edit = QLineEdit(room)
-        layout.addRow("Комната:", self.room_edit)
+        layout.addRow("Room:", self.room_edit)
         
-        # Количество мест
+        # Number of seats
         self.seats_spin = QSpinBox()
         self.seats_spin.setRange(2, 10)
         self.seats_spin.setValue(seats)
-        layout.addRow("Мест за столом:", self.seats_spin)
+        layout.addRow("Seats at table:", self.seats_spin)
         
-        # Ник героя
+        # Hero nickname
         self.hero_edit = QLineEdit(hero)
-        layout.addRow("Ваш никнейм:", self.hero_edit)
+        layout.addRow("Your nickname:", self.hero_edit)
         
-        # Кнопки
+        # Buttons
         button_layout = QHBoxLayout()
         
-        save_btn = QPushButton("💾 Сохранить")
+        save_btn = QPushButton("💾 Save")
         save_btn.clicked.connect(self.save_settings)
         button_layout.addWidget(save_btn)
         
-        cancel_btn = QPushButton("❌ Отмена")
+        cancel_btn = QPushButton("❌ Cancel")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
         
         layout.addRow(button_layout)
     
     def save_settings(self):
-        """Сохранить настройки"""
+        """Save settings"""
         self.room = self.room_edit.text().strip() or "replaypoker"
         self.seats = self.seats_spin.value()
         self.hero = self.hero_edit.text().strip() or "Elots"
@@ -148,7 +148,7 @@ class SettingsDialog(QDialog):
 
 
 class PokerAppGUI(QWidget):
-    """Главное окно GUI приложения"""
+    """Main GUI application window"""
     
     def __init__(self):
         super().__init__()
@@ -158,7 +158,7 @@ class PokerAppGUI(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_cycle)
         
-        # Настройки по умолчанию
+        # Default settings
         self.room = "replaypoker"
         self.seats = 6
         self.hero = "Elots"
@@ -166,12 +166,12 @@ class PokerAppGUI(QWidget):
         self.init_ui()
     
     def init_ui(self):
-        """Инициализация интерфейса"""
+        """Initialize interface"""
         self.setWindowTitle("Poker Assistant")
         self.setMinimumWidth(400)
         self.setFixedSize(400, 300)
         
-        # Устанавливаем шрифт
+        # Set font
         font = QFont("Segoe UI", 10)
         self.setFont(font)
         
@@ -179,37 +179,37 @@ class PokerAppGUI(QWidget):
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Заголовок
+        # Title
         title = QLabel("♠️ Poker Assistant ♥️")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50;")
         title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         layout.addWidget(title)
         
-        # Статус
-        self.status_label = QLabel("Статус: Окно не выбрано")
+        # Status
+        self.status_label = QLabel("Status: No window selected")
         self.status_label.setStyleSheet("color: #7f8c8d; padding: 10px; background-color: #ecf0f1; border-radius: 5px;")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
         
-        # Информация о выбранном окне
+        # Selected window info
         self.window_info = QLabel("")
         self.window_info.setStyleSheet("color: #34495e; font-style: italic;")
         self.window_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.window_info.setWordWrap(True)
         layout.addWidget(self.window_info)
         
-        # Разделитель
+        # Separator
         line = QLabel()
         line.setStyleSheet("background-color: #bdc3c7; min-height: 1px; max-height: 1px;")
         layout.addWidget(line)
         
-        # Кнопки управления
+        # Control buttons
         button_layout = QVBoxLayout()
         button_layout.setSpacing(10)
         
-        # Кнопка выбора окна
-        self.select_btn = QPushButton("🎯 Добавить стол (Выбрать окно)")
+        # Select window button
+        self.select_btn = QPushButton("🎯 Add Table (Select Window)")
         self.select_btn.setMinimumHeight(45)
         self.select_btn.setStyleSheet("""
             QPushButton {
@@ -230,8 +230,8 @@ class PokerAppGUI(QWidget):
         self.select_btn.clicked.connect(self.select_window)
         button_layout.addWidget(self.select_btn)
         
-        # Кнопка запуска/остановки
-        self.start_btn = QPushButton("▶️ Запустить")
+        # Start/Stop button
+        self.start_btn = QPushButton("▶️ Start")
         self.start_btn.setMinimumHeight(45)
         self.start_btn.setStyleSheet("""
             QPushButton {
@@ -258,10 +258,10 @@ class PokerAppGUI(QWidget):
         
         layout.addLayout(button_layout)
         
-        # Нижняя панель с настройками
+        # Bottom settings panel
         settings_layout = QHBoxLayout()
         
-        self.settings_btn = QPushButton("⚙️ Настройки")
+        self.settings_btn = QPushButton("⚙️ Settings")
         self.settings_btn.clicked.connect(self.open_settings)
         settings_layout.addWidget(self.settings_btn)
         
@@ -270,29 +270,29 @@ class PokerAppGUI(QWidget):
         layout.addLayout(settings_layout)
     
     def select_window(self):
-        """Открыть диалог выбора окна"""
+        """Open window selection dialog"""
         dialog = WindowSelectorDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.hwnd = dialog.selected_hwnd
             title = win32gui.GetWindowText(self.hwnd)
             
-            self.status_label.setText("Статус: ✅ Окно выбрано")
+            self.status_label.setText("Status: ✅ Window selected")
             self.status_label.setStyleSheet("color: #27ae60; padding: 10px; background-color: #d5f5e3; border-radius: 5px;")
             
-            self.window_info.setText(f"Окно: {title}")
+            self.window_info.setText(f"Window: {title}")
             self.start_btn.setEnabled(True)
             
-            print(f"✅ Выбрано окно: {title} (HWND: {self.hwnd})")
+            print(f"✅ Window selected: {title} (HWND: {self.hwnd})")
     
     def toggle_running(self):
-        """Запуск/остановка приложения"""
+        """Start/stop application"""
         if self.is_running:
             self.stop_application()
         else:
             self.start_application()
     
     def start_application(self):
-        """Запустить основное приложение"""
+        """Start main application"""
         try:
             from poker_app.state_manager import PokerStateManager
             from poker_app.capture import capture_window
@@ -306,7 +306,7 @@ class PokerAppGUI(QWidget):
             )
             
             self.is_running = True
-            self.start_btn.setText("⏹️ Остановить")
+            self.start_btn.setText("⏹️ Stop")
             self.start_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #e74c3c;
@@ -326,27 +326,27 @@ class PokerAppGUI(QWidget):
             self.select_btn.setEnabled(False)
             self.settings_btn.setEnabled(False)
             
-            self.status_label.setText("Статус: 🟢 Работает")
+            self.status_label.setText("Status: 🟢 Running")
             self.status_label.setStyleSheet("color: #27ae60; padding: 10px; background-color: #d5f5e3; border-radius: 5px;")
             
-            # Запускаем цикл обновления
+            # Start update cycle
             self.timer.start(100)  # 10 FPS
             
-            print("🟢 Приложение запущено")
+            print("🟢 Application started")
             
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось запустить приложение:\n{str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to start application:\n{str(e)}")
             self.is_running = False
     
     def stop_application(self):
-        """Остановить приложение"""
+        """Stop application"""
         self.timer.stop()
         self.is_running = False
         
         if self.state_manager and self.state_manager.enable_overlay:
             self.state_manager.overlay_window.hide_overlay()
         
-        self.start_btn.setText("▶️ Запустить")
+        self.start_btn.setText("▶️ Start")
         self.start_btn.setStyleSheet("""
             QPushButton {
                 background-color: #27ae60;
@@ -366,37 +366,37 @@ class PokerAppGUI(QWidget):
         self.select_btn.setEnabled(True)
         self.settings_btn.setEnabled(True)
         
-        self.status_label.setText("Статус: ⏸️ Остановлено")
+        self.status_label.setText("Status: ⏸️ Stopped")
         self.status_label.setStyleSheet("color: #d35400; padding: 10px; background-color: #fdebd0; border-radius: 5px;")
         
-        print("⏹️ Приложение остановлено")
+        print("⏹️ Application stopped")
     
     def update_cycle(self):
-        """Цикл обновления (вызывается таймером)"""
+        """Update cycle (called by timer)"""
         try:
             from poker_app.capture import capture_window
             
             frame = capture_window(self.hwnd)
             self.state_manager.update_from_frame(frame)
         except Exception as e:
-            print(f"Ошибка в цикле обновления: {e}")
+            print(f"Error in update cycle: {e}")
             self.stop_application()
-            QMessageBox.warning(self, "Ошибка", f"Ошибка захвата окна:\n{str(e)}")
+            QMessageBox.warning(self, "Error", f"Window capture error:\n{str(e)}")
     
     def open_settings(self):
-        """Открыть диалог настроек"""
+        """Open settings dialog"""
         dialog = SettingsDialog(self, self.room, self.seats, self.hero)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.room = dialog.room
             self.seats = dialog.seats
             self.hero = dialog.hero
-            print(f"Настройки обновлены: комната={self.room}, мест={self.seats}, герой={self.hero}")
+            print(f"Settings updated: room={self.room}, seats={self.seats}, hero={self.hero}")
 
 
 def main():
     app = QApplication(sys.argv)
     
-    # Устанавливаем стиль приложения
+    # Set application style
     app.setStyle("Fusion")
     
     window = PokerAppGUI()
